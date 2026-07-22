@@ -28,6 +28,46 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _initDefaultPlayer();
+  }
+
+  void _initDefaultPlayer() {
+    if (widget.course.modules.isNotEmpty) {
+      final firstMod = widget.course.modules.first;
+      final videoId = _extractVideoId(firstMod.youtubeVideoId);
+      if (videoId != null && videoId.length == 11) {
+        _activeModule = firstMod;
+        _youtubeController = YoutubePlayerController.fromVideoId(
+          videoId: videoId,
+          autoPlay: false,
+          params: const YoutubePlayerParams(
+            showFullscreenButton: true,
+            showControls: true,
+            enableCaption: false,
+            origin: 'https://www.youtube-nocookie.com',
+          ),
+        );
+        return;
+      }
+    }
+
+    final playlistId = _extractPlaylistId(widget.course.youtubePlaylistUrl);
+    if (playlistId != null) {
+      _activeModule = CourseModule(
+        id: 'playlist_full',
+        title: widget.course.title,
+        youtubeVideoId: playlistId,
+        duration: widget.course.duration,
+      );
+      _youtubeController = YoutubePlayerController(
+        params: const YoutubePlayerParams(
+          showFullscreenButton: true,
+          showControls: true,
+          enableCaption: false,
+          origin: 'https://www.youtube.com',
+        ),
+      )..loadPlaylist(list: [playlistId], listType: ListType.playlist);
+    }
   }
 
   @override
@@ -112,6 +152,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           showFullscreenButton: true,
           showControls: true,
           enableCaption: false,
+          origin: 'https://www.youtube.com',
         ),
       );
     } else if (playlistId != null) {
@@ -120,6 +161,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
           showFullscreenButton: true,
           showControls: true,
           enableCaption: false,
+          origin: 'https://www.youtube.com',
         ),
       )..loadPlaylist(list: [playlistId], listType: ListType.playlist);
     }
@@ -148,6 +190,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         showFullscreenButton: true,
         showControls: true,
         enableCaption: false,
+        origin: 'https://www.youtube.com',
       ),
     )..loadPlaylist(list: [playlistId], listType: ListType.playlist);
 
@@ -296,9 +339,48 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         width: double.infinity,
                         color: Colors.black,
                         child: _youtubeController != null
-                            ? AspectRatio(
-                                aspectRatio: 16 / 9,
-                                child: YoutubePlayer(controller: _youtubeController!),
+                            ? Stack(
+                                children: [
+                                  AspectRatio(
+                                    aspectRatio: 16 / 9,
+                                    child: YoutubePlayer(controller: _youtubeController!),
+                                  ),
+                                  Positioned(
+                                    top: 10,
+                                    right: 10,
+                                    child: InkWell(
+                                      onTap: () {
+                                        final target = _activeModule?.youtubeVideoId ?? widget.course.youtubePlaylistUrl;
+                                        _openInYoutubeApp(target);
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade700.withValues(alpha: 0.9),
+                                          borderRadius: BorderRadius.circular(20),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.3),
+                                              blurRadius: 6,
+                                            ),
+                                          ],
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.open_in_new_rounded, color: Colors.white, size: 14),
+                                            SizedBox(width: 4),
+                                            Text('YouTube App',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               )
                             : const Center(
                                 child: CircularProgressIndicator(
