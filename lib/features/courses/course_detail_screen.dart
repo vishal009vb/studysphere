@@ -316,48 +316,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         width: double.infinity,
                         color: Colors.black,
                         child: _youtubeController != null
-                            ? Stack(
-                                children: [
-                                  AspectRatio(
-                                    aspectRatio: 16 / 9,
-                                    child: YoutubePlayer(controller: _youtubeController!),
-                                  ),
-                                  Positioned(
-                                    top: 10,
-                                    right: 10,
-                                    child: InkWell(
-                                      onTap: () {
-                                        final target = _activeModule?.youtubeVideoId ?? widget.course.youtubePlaylistUrl;
-                                        _openInYoutubeApp(target);
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.shade700.withValues(alpha: 0.9),
-                                          borderRadius: BorderRadius.circular(20),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.3),
-                                              blurRadius: 6,
-                                            ),
-                                          ],
-                                        ),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.open_in_new_rounded, color: Colors.white, size: 14),
-                                            SizedBox(width: 4),
-                                            Text('YouTube App',
-                                                style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold)),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            ? AspectRatio(
+                                aspectRatio: 16 / 9,
+                                child: YoutubePlayer(controller: _youtubeController!),
                               )
                             : const Center(
                                 child: CircularProgressIndicator(
@@ -433,38 +394,57 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                         final enrolledIds = ref.watch(enrollmentProvider);
                         final isEnrolled = enrolledIds.contains(widget.course.id);
 
-                        return SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              if (!isEnrolled) {
-                                ref.read(enrollmentProvider.notifier).enroll(widget.course.id);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text(
-                                          'Enrolled! Go to Videos tab to start learning. 🎓')),
-                                );
-                                _tabController.animateTo(1);
-                              } else {
-                                if (_displayModules.isNotEmpty) {
-                                  _playVideo(_displayModules.first);
-                                } else {
-                                  _playFullPlaylist();
-                                }
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (!isEnrolled) {
+                                    ref.read(enrollmentProvider.notifier).enroll(widget.course.id);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              'Enrolled! Go to Videos tab to start learning. 🎓')),
+                                    );
+                                    _tabController.animateTo(1);
+                                  } else {
+                                    if (_displayModules.isNotEmpty) {
+                                      _playVideo(_displayModules.first);
+                                    } else {
+                                      _playFullPlaylist();
+                                    }
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: Text(
+                                    isEnrolled ? 'Start Learning' : 'Enroll Now',
+                                    style: const TextStyle(
+                                        fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
                             ),
-                            child: Text(
-                                isEnrolled ? 'Start Learning' : 'Enroll Now',
-                                style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold)),
-                          ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                final target = _activeModule?.youtubeVideoId ?? widget.course.youtubePlaylistUrl;
+                                _openInYoutubeApp(target);
+                              },
+                              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                              label: const Text('YouTube'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red.shade700,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                              ),
+                            ),
+                          ],
                         );
                       },
                     ),
