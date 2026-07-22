@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -75,11 +74,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     _youtubeController = YoutubePlayerController.fromVideoId(
       videoId: firstVideoId,
       autoPlay: false,
-      params: YoutubePlayerParams(
+      params: const YoutubePlayerParams(
         showFullscreenButton: true,
         showControls: true,
         enableCaption: false,
-        origin: kIsWeb ? Uri.base.origin : 'https://www.youtube.com',
       ),
     );
   }
@@ -169,11 +167,10 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     _youtubeController = YoutubePlayerController.fromVideoId(
       videoId: videoId,
       autoPlay: true,
-      params: YoutubePlayerParams(
+      params: const YoutubePlayerParams(
         showFullscreenButton: true,
         showControls: true,
         enableCaption: false,
-        origin: kIsWeb ? Uri.base.origin : 'https://www.youtube.com',
       ),
     );
 
