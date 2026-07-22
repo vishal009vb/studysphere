@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "726667741250",
+    "project_id": "studysphere-app-3a480",
+    "storage_bucket": "studysphere-app-3a480.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:726667741250:android:941a22c8e0218bab5a85db",
+        "android_client_info": {
+          "package_name": "com.studysphere"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "726667741250-o5v8prqtkfcq8eofqhljf48p4fec6973.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.studysphere",
+            "certificate_hash": "d510f07c8b713fe7c38db923884068749a59e3b9"
+          }
+        },
+        {
+          "client_id": "726667741250-00il2941gflc3q3hntunr3d31lgpluvq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCFxPa8y4Te186YjSqW2_A_eYaQYCKaofE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "726667741250-00il2941gflc3q3hntunr3d31lgpluvq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

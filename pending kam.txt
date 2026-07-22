@@ -1,0 +1,485 @@
+# StudySphere — Pending Task: Premium Contact Support System
+
+## Goal
+
+Upgrade the current Contact Support screen into a clean, modern and production-ready support system while keeping the implementation lightweight and Firebase-friendly.
+
+Do NOT overcomplicate the feature.
+
+The UI should match the existing StudySphere premium design system.
+
+---
+
+## Features to Implement
+
+### 1. Premium Hero Section
+
+Display:
+
+* Support Icon
+* "Contact Support"
+* Small description
+* "Average Response Time: Within 24 Hours"
+
+Use the existing StudySphere design language.
+
+---
+
+### 2. Issue Type
+
+Add a dropdown (required).
+
+Options:
+
+* Bug Report
+* Feature Request
+* Notes Issue
+* AI Assistant Issue
+* Community Issue
+* Account Problem
+* Other
+
+---
+
+### 3. Subject Field
+
+Required.
+
+Examples:
+
+* App Crash
+* Unable to Download Notes
+* AI Not Responding
+
+---
+
+### 4. Message Field
+
+Required.
+
+Minimum 20 characters.
+
+Maximum 1000 characters.
+
+Display live character counter.
+
+---
+
+### 5. Support Email
+
+Display
+
+[support@studysphere.app](mailto:support@studysphere.app)
+
+(or current support email)
+
+User should be able to tap to copy/open email.
+
+---
+
+### 6. Send Button
+
+Show loading animation while sending.
+
+Disable button during upload.
+
+After success
+
+Show beautiful success dialog instead of only a SnackBar.
+
+---
+
+### 7. Firestore Integration
+
+Create
+
+supportTickets
+
+collection.
+
+Each ticket should contain:
+
+* userId
+* userName
+* email
+* issueType
+* subject
+* message
+* status (Pending)
+* createdAt
+
+Only ONE Firestore write per ticket.
+
+No unnecessary reads.
+
+---
+
+### 8. Validation
+
+Validate:
+
+* Empty Issue Type
+* Empty Subject
+* Empty Message
+* Minimum message length
+
+---
+
+### 9. Performance
+
+Keep the screen lightweight.
+
+Do NOT fetch unnecessary Firestore data.
+
+Do NOT create realtime listeners.
+
+Do NOT use StreamBuilder.
+
+Only write data when the user presses Send.
+
+---
+
+### 10. UI
+
+Follow the existing StudySphere design system.
+
+Use existing:
+
+* AppColors
+* AppTextStyles
+* Buttons
+* Cards
+* Theme
+
+Maintain consistency with the Home Screen.
+
+---
+
+## Future Features (DO NOT IMPLEMENT NOW)
+
+These should only be added later:
+
+* Screenshot Attachment
+* Ticket History
+* Ticket Status
+* Admin Reply
+* Push Notifications
+* Live Chat
+* FAQ
+* Search Tickets
+
+Keep these as future roadmap items only.
+
+---
+
+## Requirements
+
+* Clean architecture
+* Riverpod compatible
+* Proper validation
+* Responsive
+* Production-ready
+* No breaking changes
+* No unnecessary Firebase usage
+* Minimal Firestore reads/writes
+* Smooth animations
+* Premium UX
+
+The implementation should feel simple, polished and optimized without increasing Firebase costs unnecessarily.
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+# StudySphere — Phase: Complete Legal & Compliance System
+
+## Goal
+
+Create a complete legal and compliance module for StudySphere that follows modern app standards and is suitable for publishing on the Google Play Store.
+
+The implementation should be professional, clean, and future-proof.
+
+The UI must follow the existing StudySphere design system.
+
+---
+
+# Screens to Create / Upgrade
+
+## 1. Privacy Policy
+
+Create a complete Privacy Policy.
+
+Include:
+
+* Introduction
+* Information We Collect
+* Account Information
+* Uploaded Notes & Study Materials
+* Community Posts
+* AI Chat Data
+* Device Information
+* Analytics
+* Cookies (Website/Future)
+* How Data Is Used
+* Third-Party Services
+* Firebase
+* Cloudinary
+* Google Gemini
+* Data Storage
+* Data Retention
+* Data Security
+* User Rights
+* Delete Account
+* Delete Data Request
+* Children's Privacy
+* Policy Updates
+* Contact Information
+
+Do not use placeholder text.
+
+Write a real production-ready privacy policy.
+
+---
+
+## 2. Terms & Conditions
+
+Create complete Terms of Service.
+
+Include:
+
+* Acceptance of Terms
+* User Responsibilities
+* Educational Purpose
+* Community Rules
+* Upload Rules
+* AI Usage Policy
+* Account Suspension
+* Content Removal
+* Intellectual Property
+* Copyright Policy
+* Limitation of Liability
+* No Warranty
+* Governing Law (India)
+* Termination
+* Contact Information
+
+Write professional legal language suitable for production.
+
+---
+
+## 3. Community Guidelines
+
+Create a dedicated screen.
+
+Include rules for:
+
+* Respect Others
+* No Hate Speech
+* No Harassment
+* No Spam
+* No Fake Information
+* Educational Content Only
+* No Adult Content
+* No Illegal Content
+* No Malware
+* No Personal Information Sharing
+* Report Abuse
+
+---
+
+## 4. Copyright & Content Removal Policy
+
+Create a dedicated screen.
+
+Include:
+
+* Copyright Notice
+* Respect Intellectual Property
+* Report Copyright Infringement
+* Content Review Process
+* Content Removal Process
+* Repeat Violations
+* Counter Notice
+* Contact Email
+
+State clearly that StudySphere removes infringing content after verification.
+
+---
+
+## 5. AI Disclaimer
+
+Create a dedicated screen.
+
+Explain:
+
+* AI may generate incorrect answers.
+* Students should verify important educational information.
+* AI is for learning assistance only.
+* AI should not be treated as professional advice.
+
+---
+
+## 6. Content Disclaimer
+
+Explain that:
+
+* Notes are uploaded by users.
+* StudySphere does not guarantee accuracy.
+* Users should verify educational materials.
+* Community content represents individual users.
+
+---
+
+## 7. Contact Support
+
+Upgrade the existing Contact Support page.
+
+Include:
+
+* Issue Type
+* Subject
+* Message
+* Validation
+* Firestore Ticket Creation
+* Success Dialog
+
+Do not implement screenshots or ticket history yet.
+
+---
+
+## 8. Delete Account
+
+Create a dedicated screen.
+
+Allow users to:
+
+* Request account deletion
+* Understand what data will be deleted
+* Understand what may remain for legal or security purposes
+* Confirm deletion
+
+---
+
+## 9. Report Content Flow
+
+Every Note
+
+Every Post
+
+Every Comment
+
+Every Question Paper
+
+should have
+
+Report
+
+option.
+
+Reports should be stored in Firestore.
+
+Admin should be able to review them.
+
+---
+
+## 10. Admin Moderation
+
+Create moderation support for:
+
+* Remove Content
+* Warn User
+* Suspend User
+* Ban User
+* Resolve Report
+* View Report History
+
+---
+
+## Firestore Collections
+
+Create only these collections:
+
+reports
+
+supportTickets
+
+moderationLogs
+
+No unnecessary collections.
+
+---
+
+## Performance
+
+Keep all legal pages completely local.
+
+Do NOT fetch legal text from Firebase.
+
+Do NOT use StreamBuilder.
+
+Do NOT create realtime listeners.
+
+These pages should load instantly.
+
+---
+
+## UI Requirements
+
+Use the existing StudySphere Premium UI.
+
+Maintain consistent:
+
+* AppColors
+* Typography
+* Cards
+* Buttons
+* Icons
+* Spacing
+
+Every legal page should have:
+
+* Hero Header
+* Last Updated Date
+* Expandable Sections
+* Easy-to-read typography
+* Search-ready structure
+* Responsive layout
+
+---
+
+## Important
+
+Do not copy legal text from other apps.
+
+Generate original, professional, production-ready legal content suitable for an educational platform.
+
+The content should be appropriate for StudySphere, which allows students to upload notes, question papers, community posts, and use an AI study assistant.
+
+Use clear language while maintaining a professional legal tone.
+
+---
+
+## Future (Do NOT Implement Now)
+
+* GDPR Compliance
+* CCPA Compliance
+* Cookie Consent
+* Appeals System
+* Copyright Counter Notice Portal
+* Legal Request Dashboard
+
+Keep these as future roadmap items only.
+
+
+_____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
+
+
+
+
+
+
+
+

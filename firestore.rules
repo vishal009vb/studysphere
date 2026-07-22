@@ -1,0 +1,299 @@
+﻿rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Role helpers ──────────────────────────────────────────────────────────
+
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isModerator() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'moderator';
+    }
+
+    function isContributor() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'contributor';
+    }
+
+    function isAdminOrModerator() {
+      return isAdmin() || isModerator();
+    }
+
+    // ── Auth helpers ──────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── CRITICAL: Fields that ONLY Cloud Functions (Admin SDK) may write ──────
+    //
+    // dailyUsageCount and lastResetDate are controlled exclusively by
+    // checkAndIncrementUsage / askGeminiAI Cloud Functions.
+    // Direct client writes to these fields are BLOCKED here.
+
+    function isAttemptingRateLimitWrite() {
+      return request.resource.data.keys().hasAny(['dailyUsageCount', 'lastResetDate']);
+    }
+
+    // ── Input size guards ─────────────────────────────────────────────────────
+
+    function validStringField(field, maxLen) {
+      return request.resource.data[field] is string &&
+             request.resource.data[field].size() <= maxLen;
+    }
+
+    // ── Users Collection ──────────────────────────────────────────────────────
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+
+      allow update: if isSignedIn()
+                    && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isBanned', 'isSuspended', 'isVerified', 'reputationPoints', 'contributorRank'])
+                    && !isAttemptingRateLimitWrite()
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyAiUsage', 'lastUsageReset'])
+                        || (request.resource.data.dailyAiUsage == resource.data.dailyAiUsage + 1)
+                        || (request.resource.data.dailyAiUsage == 1 && request.resource.data.lastUsageReset != resource.data.lastUsageReset));
+
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+
+      match /chatHistory/{messageId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      match /enrolledCourses/{courseId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+
+    // ── Banners Collection ───────────────────────────────────────────────────
+
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create, update, delete: if isAdminOrModerator();
+    }
+
+    // ── Courses Collection ───────────────────────────────────────────────────
+
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Colleges Collection ──────────────────────────────────────────────────
+
+    match /colleges/{collegeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ── Notes Collection ─────────────────────────────────────────────────────
+    // [H-01 FIX] Replaced blanket `allow write` with granular permissions.
+
+    match /notes/{noteId} {
+      allow read: if isSignedIn() && (
+        resource.data.status == 'approved' ||
+        resource.data.uploadedBy == request.auth.uid ||
+        isAdminOrModerator()
+      );
+
+      allow create: if isSignedIn()
+                    && request.resource.data.uploadedBy == request.auth.uid
+                    && (request.resource.data.status == 'pending' || isAdmin())
+                    && validStringField('title', 120)
+                    && validStringField('subject', 100);
+
+      allow update: if isSignedIn() &&
+                    (
+                      (resource.data.uploadedBy == request.auth.uid &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'uploadedBy', 'fileHash', 'pdfUrl', 'likes', 'downloads', 'reports', 'qualityScore']))
+                      || isAdminOrModerator()
+                    );
+
+      allow delete: if isSignedIn() &&
+                    (resource.data.uploadedBy == request.auth.uid || isAdminOrModerator());
+    }
+
+    // ── Question Papers Collection ────────────────────────────────────────────
+
+    match /questionPapers/{paperId} {
+      allow read: if resource.data.status == 'approved' || isAdminOrModerator();
+      allow create: if isSignedIn()
+                    && (isContributor() || isAdmin())
+                    && request.resource.data.uploadedBy == request.auth.uid
+                    && (request.resource.data.status == 'pending' || isAdmin())
+                    && validStringField('title', 120)
+                    && validStringField('subject', 100);
+      allow update, delete: if isAdminOrModerator();
+    }
+
+    // ── Community Posts Collection ────────────────────────────────────────────
+
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && (isContributor() || isAdmin())
+                    && request.resource.data.authorId == request.auth.uid
+                    && validStringField('content', 2000)
+                    && request.resource.data.keys().hasAll(['authorId', 'content', 'createdAt'])
+                    && request.resource.data.createdAt == request.time;
+      allow update: if isSignedIn()
+                    && (resource.data.authorId == request.auth.uid || isAdminOrModerator());
+      allow delete: if isAdminOrModerator()
+                    || (isSignedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    // ── Reposts Collection ───────────────────────────────────────────────────
+    // [H-02 FIX] Added ownership validation.
+
+    match /reposts/{repostId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── Comments Collection ───────────────────────────────────────────────────
+    // [M-04 FIX] Required field validation and max-length enforcement.
+
+    match /comments/{commentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.authorId == request.auth.uid
+                    && validStringField('content', 500)
+                    && request.resource.data.keys().hasAll(['authorId', 'contentId', 'content']);
+      allow delete: if isSignedIn()
+                    && (resource.data.authorId == request.auth.uid || isAdminOrModerator());
+      allow update: if false;
+    }
+
+    // ── Likes Collection ─────────────────────────────────────────────────────
+
+    match /likes/{likeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.userId == request.auth.uid;
+    }
+
+    // ── Followers Collection ──────────────────────────────────────────────────
+
+    match /followers/{followId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.followerId == request.auth.uid;
+    }
+
+    // ── Bookmarks Collection ──────────────────────────────────────────────────
+
+    match /bookmarks/{bookmarkId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── Blocks Collection ─────────────────────────────────────────────────────
+    // [L-01 FIX] Added explicit rules for blocks collection.
+
+    match /blocks/{blockId} {
+      allow read: if isSignedIn() && resource.data.blockerId == request.auth.uid;
+      allow create: if isSignedIn()
+                    && request.resource.data.blockerId == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.blockerId == request.auth.uid;
+      allow update: if false;
+    }
+
+    // ── Reports Collection ────────────────────────────────────────────────────
+    // [M-05 FIX] Required field validation for reports.
+
+    match /reports/{reportId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.reporterId == request.auth.uid
+                    && request.resource.data.keys().hasAll(['reporterId', 'contentId', 'contentType', 'reason'])
+                    && validStringField('reason', 500);
+      allow read, update, delete: if isAdminOrModerator();
+    }
+
+    // ── Notifications Collection ──────────────────────────────────────────────
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn()
+                  && resource.data.receiverId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn()
+                    && resource.data.receiverId == request.auth.uid;
+      allow delete: if isSignedIn()
+                    && resource.data.receiverId == request.auth.uid;
+    }
+
+    // ── Admin Logs Collection ────────────────────────────────────────────────
+
+    match /adminLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ── Location Data ────────────────────────────────────────────────────────
+
+    match /states/{stateId} {
+      allow read: if true;
+    }
+    match /districts/{districtId} {
+      allow read: if true;
+    }
+    match /talukas/{talukaId} {
+      allow read: if true;
+    }
+    match /locations/{docId} {
+      allow read: if true;
+    }
+
+    // ── AI History (legacy flat collection) ───────────────────────────────────
+
+    match /aiHistory/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── Support Tickets ───────────────────────────────────────────────────────
+
+    match /supportTickets/{ticketId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid
+                    && validStringField('message', 2000);
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Deletion Requests ─────────────────────────────────────────────────────
+
+    match /deletionRequests/{reqId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.userId == request.auth.uid;
+      allow read, delete: if isAdmin();
+    }
+
+    // ── Moderation Logs ───────────────────────────────────────────────────────
+
+    match /moderationLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
+

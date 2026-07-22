@@ -1,0 +1,55 @@
+﻿rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper: check admin role in Firestore
+    function isAdmin() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data.role == 'admin';
+    }
+
+    // ── PDF Uploads ───────────────────────────────────────────────────────────
+    // [P-03 FIX] Reads now require authentication.
+    // Only authenticated users can download PDFs.
+    // Writes: only the owner, PDF only, max 20 MB.
+    match /uploads/pdfs/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 20 * 1024 * 1024
+                   && request.resource.contentType == 'application/pdf';
+      allow delete: if request.auth != null
+                    && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ── User Profile Images ───────────────────────────────────────────────────
+    match /studysphere_images/{userId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+                    && (request.auth.uid == userId || isAdmin());
+    }
+
+    // ── Legacy paths — read-only, no new writes ───────────────────────────────
+    match /notes/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /questionPapers/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── Catch-all DENY ────────────────────────────────────────────────────────
+    // Any path not explicitly matched above is denied.
+    // This prevents enumeration of unknown paths.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
