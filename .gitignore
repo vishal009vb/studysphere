@@ -90,6 +90,10 @@ app.*.map.json
 supabase/.env.local
 supabase/.env
 
+# Node modules
+**/node_modules/
+node_modules/
+
 # Supabase local secrets — NEVER commit
 supabase/config.toml.local
 
