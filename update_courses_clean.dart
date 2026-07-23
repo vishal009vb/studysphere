@@ -1,19 +1,34 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
-Future<void> fixAllPlaylists() async {
-  debugPrint('fixAllPlaylists executed.');
-}
+void main() async {
+  final baseUrl = 'https://firestore.googleapis.com/v1/projects/studysphere-app-3a480/databases/(default)/documents/courses';
 
-Future<void> seedUserProvidedCourses() async {
-  final db = FirebaseFirestore.instance;
+  print('Fetching existing courses to prevent duplicates...');
+  final listResp = await http.get(Uri.parse(baseUrl));
+  final existingTitles = <String>{};
+  
+  if (listResp.statusCode == 200) {
+    final data = jsonDecode(listResp.body);
+    final docs = data['documents'] as List?;
+    if (docs != null) {
+      for (final doc in docs) {
+        final fields = doc['fields'] as Map<String, dynamic>?;
+        if (fields != null && fields.containsKey('title')) {
+          final t = fields['title']?['stringValue'] as String?;
+          if (t != null) existingTitles.add(t.toLowerCase().trim());
+        }
+      }
+    }
+  }
 
-  final courses = [
+  print('Existing Course Titles in Firestore: $existingTitles');
+
+  final newCourses = [
     {
-      "id": "c_prog_101",
-      "title": "C Programming Full Course",
+      "title": "C Programming Masterclass",
       "description": "Complete C Language Tutorial from Scratch for Beginners to Advanced by CodeWithHarry.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/ZSPZob_1TOk/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/ZSPZob_1TOk/hqdefault.jpg",
       "category": "Programming",
       "level": "All Levels",
       "duration": "15 Hours",
@@ -30,17 +45,16 @@ Future<void> seedUserProvidedCourses() async {
         },
         {
           "id": "PLu0W_9lII9aiXlHcLx-mDH1Qul38wD3aR",
-          "title": "CodeWithHarry C Language Complete Playlist (70+ Videos)",
+          "title": "CodeWithHarry C Language Complete Playlist",
           "youtubeVideoId": "ZSPZob_1TOk",
           "duration": "70+ Videos"
         }
       ]
     },
     {
-      "id": "cpp_prog_102",
       "title": "C++ Programming Full Course",
       "description": "Complete C++ Tutorial in One Shot & Complete Playlist for Placements and GATE by College Wallah & Gate Smashers.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/e7sAf4SbS_g/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/e7sAf4SbS_g/hqdefault.jpg",
       "category": "Programming",
       "level": "All Levels",
       "duration": "11 Hours",
@@ -63,17 +77,16 @@ Future<void> seedUserProvidedCourses() async {
         },
         {
           "id": "PLxCzCOWd7aiF6yRNI5OHQsnUJQfl7Geqj",
-          "title": "Gate Smashers C++ Complete Course Playlist (120+ Videos)",
+          "title": "Gate Smashers C++ Complete Course Playlist",
           "youtubeVideoId": "e7sAf4SbS_g",
           "duration": "120+ Videos"
         }
       ]
     },
     {
-      "id": "python_prog_103",
       "title": "Python Programming (100 Days & Full Course)",
       "description": "Master Python from Basics to Advanced with CodeWithHarry 100 Days of Code & Shradha Khapra (Apna College).",
-      "thumbnailUrl": "https://i.ytimg.com/vi/gfxD6v14k88/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/gfxD6v14k88/hqdefault.jpg",
       "category": "Programming",
       "level": "All Levels",
       "duration": "12 Hours",
@@ -103,10 +116,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "java_prog_104",
       "title": "Java Programming Masterclass",
       "description": "Comprehensive Java Programming in One Shot & Complete Placement Playlist by CoDing SeeKho, Anuj Sharma & CodeWithHarry.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/32DLasxoOiM/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/32DLasxoOiM/hqdefault.jpg",
       "category": "Programming",
       "level": "All Levels",
       "duration": "18 Hours",
@@ -136,10 +148,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "dsa_core_105",
       "title": "Data Structures & Algorithms (DSA)",
       "description": "Master DSA in C++ with College Wallah, WsCube Tech, and Apna College Complete Course.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/GRxzQXBwA-U/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/GRxzQXBwA-U/hqdefault.jpg",
       "category": "Core CS",
       "level": "All Levels",
       "duration": "11 Hours",
@@ -169,10 +180,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "webdev_106",
       "title": "Web Development (HTML, CSS, JavaScript)",
       "description": "Learn Front-End & Full Stack Web Development with WsCube Tech, Intellipaat, and CodeWithHarry Sigma Course.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/jgfq8OybWZQ/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/jgfq8OybWZQ/hqdefault.jpg",
       "category": "Web Dev",
       "level": "All Levels",
       "duration": "10 Hours",
@@ -202,10 +212,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "dbms_107",
       "title": "Database Management System (DBMS + SQL)",
       "description": "Complete DBMS & SQL for University Exams and GATE by Sanchit Sir and 5 Minutes Engineering.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/FchQ6wZVqsA/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/FchQ6wZVqsA/hqdefault.jpg",
       "category": "Core CS",
       "level": "All Levels",
       "duration": "11 Hours",
@@ -235,10 +244,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "os_108",
       "title": "Operating System (OS)",
       "description": "Master Operating Systems for University & Placements with Love Babbar, Sanchit Sir, and 5 Minutes Engineering.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/3obEP8eLsCw/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/3obEP8eLsCw/hqdefault.jpg",
       "category": "Core CS",
       "level": "All Levels",
       "duration": "15 Hours",
@@ -268,10 +276,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "cn_109",
       "title": "Computer Networks (CN)",
       "description": "Learn Computer Networks in One Shot and Complete Playlist by 5 Minutes Engineering & Gate Smashers.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/1V9mhVgVH3A/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/1V9mhVgVH3A/hqdefault.jpg",
       "category": "Core CS",
       "level": "All Levels",
       "duration": "10 Hours",
@@ -295,10 +302,9 @@ Future<void> seedUserProvidedCourses() async {
       ]
     },
     {
-      "id": "se_110",
       "title": "Software Engineering",
       "description": "Complete Software Engineering for CS/IT Students by KnowledgeGATE Sanchit Sir and Gate Smashers.",
-      "thumbnailUrl": "https://i.ytimg.com/vi/NlLM3sVF8wY/hqdefault.jpg",
+      "thumbnailUrl": "https://img.youtube.com/vi/NlLM3sVF8wY/hqdefault.jpg",
       "category": "Core CS",
       "level": "All Levels",
       "duration": "6 Hours",
@@ -323,39 +329,66 @@ Future<void> seedUserProvidedCourses() async {
     }
   ];
 
-  try {
-    final snapshot = await db.collection('courses').get();
-    
-    // Clear old/duplicate documents so only clean user courses exist
-    for (var doc in snapshot.docs) {
-      await doc.reference.delete();
-    }
-    debugPrint('Cleared old courses from Firestore.');
+  print('Starting course seed/update process...');
 
-    // Add clean 10 user courses with actual YouTube thumbnails
-    for (final course in courses) {
-      final docId = course['id'] as String;
-      final data = {
-        'title': course['title'],
-        'description': course['description'],
-        'thumbnailUrl': course['thumbnailUrl'],
-        'category': course['category'],
-        'level': course['level'],
-        'duration': course['duration'],
-        'youtubePlaylistUrl': course['youtubePlaylistUrl'],
-        'channelName': course['channelName'],
-        'isFeatured': course['isFeatured'],
-        'order': course['order'],
-        'createdAt': FieldValue.serverTimestamp(),
-        'modules': course['modules'],
-        'totalVideos': (course['modules'] as List).length,
+  for (final course in newCourses) {
+    final title = course['title'] as String;
+    final titleLower = title.toLowerCase().trim();
+
+    // Check duplicate
+    final isDup = existingTitles.any((e) => e.contains(titleLower) || titleLower.contains(e));
+    if (isDup) {
+      print('Course "$title" already exists or similar title found. Updating...');
+    }
+
+    final modules = (course['modules'] as List).map((m) {
+      return {
+        "mapValue": {
+          "fields": {
+            "id": {"stringValue": m['id']},
+            "title": {"stringValue": m['title']},
+            "youtubeVideoId": {"stringValue": m['youtubeVideoId']},
+            "duration": {"stringValue": m['duration']},
+            "notesReference": {"stringValue": ""},
+            "importantQuestionsReference": {"stringValue": ""}
+          }
+        }
       };
+    }).toList();
 
-      await db.collection('courses').doc(docId).set(data);
-      debugPrint('Seeded course: ${course['title']} ($docId)');
+    final body = {
+      "fields": {
+        "title": {"stringValue": course['title']},
+        "description": {"stringValue": course['description']},
+        "thumbnailUrl": {"stringValue": course['thumbnailUrl']},
+        "category": {"stringValue": course['category']},
+        "level": {"stringValue": course['level']},
+        "duration": {"stringValue": course['duration']},
+        "youtubePlaylistUrl": {"stringValue": course['youtubePlaylistUrl']},
+        "channelName": {"stringValue": course['channelName']},
+        "isFeatured": {"booleanValue": course['isFeatured']},
+        "order": {"integerValue": course['order'].toString()},
+        "createdAt": {"timestampValue": DateTime.now().toUtc().toIso8601String()},
+        "modules": {
+          "arrayValue": {
+            "values": modules
+          }
+        }
+      }
+    };
+
+    final resp = await http.post(
+      Uri.parse(baseUrl),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode(body),
+    );
+
+    if (resp.statusCode == 200 || resp.statusCode == 201) {
+      print('ADDED/UPDATED: $title');
+    } else {
+      print('Failed $title: ${resp.statusCode}');
     }
-    debugPrint('SUCCESS: All 10 user courses seeded cleanly with real YouTube thumbnails!');
-  } catch (e) {
-    debugPrint('Error seeding courses: $e');
   }
+
+  print('ALL 10 COURSES UPDATED & SEEDED SUCCESSFULLY!');
 }

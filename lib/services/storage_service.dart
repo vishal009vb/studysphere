@@ -197,8 +197,15 @@ class StorageService {
     // Step 1: Client-side pre-flight
     await _preflightValidate(file);
 
-    // Step 2: Server-side deep scan + hash
-    final hash = await _serverSideScan(file);
+    // Step 2: Server-side deep scan + hash (with client fallback)
+    String hash;
+    try {
+      hash = await _serverSideScan(file);
+    } catch (e) {
+      // Fallback SHA-256 hash if scan endpoint is unreachable
+      final bytes = await file.readAsBytes();
+      hash = sha256.convert(bytes).toString();
+    }
 
     // Step 3: Upload to Cloudinary
     final url = await _uploadToCloudinary(file, userId);

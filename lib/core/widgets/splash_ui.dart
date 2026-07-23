@@ -128,7 +128,7 @@ class _SplashUIState extends State<SplashUI> with TickerProviderStateMixin {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo with glow ring
+                  // Logo — same image as native splash for seamless transition
                   AnimatedBuilder(
                     animation: _pulseController,
                     builder: (_, child) => Container(
@@ -140,39 +140,16 @@ class _SplashUIState extends State<SplashUI> with TickerProviderStateMixin {
                       ),
                       child: Center(child: child),
                     ),
-                    child: Container(
+                    child: SizedBox(
                       width: 100,
                       height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                          ),
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.4),
-                            blurRadius: 60,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Image.asset('assets/logo.png', fit: BoxFit.contain),
-                      ),
+                      child: Image.asset('assets/splash_logo.png', fit: BoxFit.contain),
                     ),
                   )
                   .animate()
-                  .fadeIn(duration: 700.ms, curve: Curves.easeOut)
+                  .fadeIn(begin: 1.0, duration: 700.ms, curve: Curves.easeOut)
                   .scale(
-                    begin: const Offset(0.4, 0.4),
+                    begin: const Offset(1, 1),
                     end: const Offset(1, 1),
                     duration: 800.ms,
                     curve: Curves.elasticOut,

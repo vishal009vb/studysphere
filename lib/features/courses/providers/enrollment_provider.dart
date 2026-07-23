@@ -30,3 +30,44 @@ final enrollmentProvider = StateNotifierProvider<EnrollmentNotifier, List<String
   final prefs = ref.watch(sharedPreferencesProvider);
   return EnrollmentNotifier(prefs);
 });
+
+class CourseProgressNotifier extends StateNotifier<Map<String, Set<String>>> {
+  final SharedPreferences _prefs;
+
+  CourseProgressNotifier(this._prefs) : super(_loadInitial(_prefs));
+
+  static Map<String, Set<String>> _loadInitial(SharedPreferences prefs) {
+    final map = <String, Set<String>>{};
+    for (final key in prefs.getKeys()) {
+      if (key.startsWith('completed_modules_')) {
+        final courseId = key.substring('completed_modules_'.length);
+        final list = prefs.getStringList(key) ?? [];
+        map[courseId] = list.toSet();
+      }
+    }
+    return map;
+  }
+
+  Future<void> toggleModuleCompleted(String courseId, String moduleId) async {
+    final currentSet = Set<String>.from(state[courseId] ?? {});
+    if (currentSet.contains(moduleId)) {
+      currentSet.remove(moduleId);
+    } else {
+      currentSet.add(moduleId);
+    }
+
+    final newState = Map<String, Set<String>>.from(state);
+    newState[courseId] = currentSet;
+    await _prefs.setStringList('completed_modules_$courseId', currentSet.toList());
+    state = newState;
+  }
+
+  Set<String> getCompletedModules(String courseId) {
+    return state[courseId] ?? {};
+  }
+}
+
+final courseProgressProvider = StateNotifierProvider<CourseProgressNotifier, Map<String, Set<String>>>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return CourseProgressNotifier(prefs);
+});

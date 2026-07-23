@@ -132,6 +132,14 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
   }
 
   List<String> get _semesters {
+    if (_selectedCourse.isEmpty || _selectedCourse == 'All') {
+      return ['All', ...List.generate(6, (i) => 'Semester ${i + 1}')];
+    }
+    final courseMap = _courseSubjects[_selectedCourse];
+    if (courseMap != null && courseMap.isNotEmpty) {
+      final maxSem = courseMap.keys.length;
+      return ['All', ...List.generate(maxSem, (i) => 'Semester ${i + 1}')];
+    }
     return ['All', ...List.generate(6, (i) => 'Semester ${i + 1}')];
   }
 
@@ -478,6 +486,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
                         onSelected: (_) {
                           setState(() {
                             _selectedCourse = course == 'All' ? '' : course;
+                            final validSems = _semesters;
+                            if (!validSems.contains(_selectedSemester)) {
+                              _selectedSemester = '';
+                            }
                           });
                           _loadNotes();
                         },

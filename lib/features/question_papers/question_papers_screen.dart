@@ -30,6 +30,12 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
 
   static const List<Map<String, dynamic>> _courses = [
     {'name': 'BCA', 'icon': Icons.computer_rounded},
+    {'name': 'B.Sc CS', 'icon': Icons.science_rounded},
+    {'name': 'MCA', 'icon': Icons.terminal_rounded},
+    {'name': 'B.Tech', 'icon': Icons.engineering_rounded},
+    {'name': 'MBA', 'icon': Icons.business_center_rounded},
+    {'name': 'B.Com', 'icon': Icons.account_balance_rounded},
+    {'name': 'BA', 'icon': Icons.menu_book_rounded},
   ];
 
   static const List<Map<String, dynamic>> _semesters = [

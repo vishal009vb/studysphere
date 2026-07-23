@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -35,10 +35,24 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
 
   final List<String> _courses = [
     'BCA',
+    'B.Sc CS',
+    'MCA',
+    'B.Tech',
+    'MBA',
+    'B.Com',
+    'BA',
   ];
 
   List<String> get _semesters {
-    return List.generate(6, (i) => 'Semester ${i + 1}');
+    int maxSem = 6;
+    if (_selectedCourse == 'MCA' || _selectedCourse == 'MBA') {
+      maxSem = 4;
+    } else if (_selectedCourse == 'B.Tech') {
+      maxSem = 8;
+    } else {
+      maxSem = 6;
+    }
+    return List.generate(maxSem, (i) => 'Semester ${i + 1}');
   }
   bool _isPaper = false;
   bool _isUploading = false;

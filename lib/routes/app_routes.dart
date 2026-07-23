@@ -1,14 +1,12 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/analytics_service.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../core/widgets/splash_ui.dart';
-import '../core/constants/app_colors.dart';
 
 // Import features (these screens will be created next)
 import '../features/auth/login_screen.dart';
@@ -227,6 +225,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
+    // Remove native splash — Flutter Frame 0 is now painted (seamless transition)
+    FlutterNativeSplash.remove();
     // Cache logo to avoid pop-in
     WidgetsBinding.instance.addPostFrameCallback((_) {
       precacheImage(const AssetImage('assets/logo.png'), context);
@@ -235,8 +235,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _navigate() async {
-    // Wait for the animation duration
-    await Future.delayed(const Duration(milliseconds: 1800));
+    // Fast splash navigation (200ms)
+    await Future.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
 
     try {

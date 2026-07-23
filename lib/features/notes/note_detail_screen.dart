@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 import 'dart:io';
 import '../../services/analytics_service.dart';
 import 'package:open_file/open_file.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class NoteDetailScreen extends ConsumerStatefulWidget {
   final String noteId;
@@ -53,9 +54,20 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       final user = ref.read(authServiceProvider).currentUser;
       final db = FirebaseFirestore.instance;
 
-      // Fetch note directly by ID
-      final noteDoc = await db.collection('notes').doc(widget.noteId).get();
-      if (!noteDoc.exists) throw Exception('Note not found');
+      // Fetch note directly by ID with fallback
+      DocumentSnapshot<Map<String, dynamic>> noteDoc;
+      try {
+        noteDoc = await db.collection('notes').doc(widget.noteId).get();
+      } catch (_) {
+        noteDoc = await db
+            .collection('notes')
+            .doc(widget.noteId)
+            .get(const GetOptions(source: Source.serverAndCache));
+      }
+
+      if (!noteDoc.exists || noteDoc.data() == null) {
+        throw Exception('Note not found');
+      }
       final note = NoteModel.fromMap(noteDoc.data()!, noteDoc.id);
 
       final svc = ref.read(firestoreServiceProvider);
@@ -66,36 +78,40 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
         } catch (_) {}
       }
 
-      // Increment view count
+      // Increment view count asynchronously
       db.collection('notes').doc(widget.noteId).update({
         'views': FieldValue.increment(1),
-      });
+      }).catchError((_) {});
 
-      // Load top-level comments
-      final commentsSnap = await db
-          .collection('comments')
-          .where('contentId', isEqualTo: widget.noteId)
-          .orderBy('createdAt', descending: false)
-          .get();
-      final comments = commentsSnap.docs
-          .where((doc) => doc.data()['parentId'] == null)
-          .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
-          .toList();
+      // Safely load top-level comments
+      List<CommentModel> comments = [];
+      try {
+        final commentsSnap = await db
+            .collection('comments')
+            .where('contentId', isEqualTo: widget.noteId)
+            .get();
+        comments = commentsSnap.docs
+            .where((doc) => doc.data()['parentId'] == null)
+            .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
+            .toList();
+      } catch (_) {}
 
-      // Check liked/bookmarked
+      // Check liked/bookmarked safely
       bool isLiked = false;
       bool isBookmarked = false;
       if (user != null) {
-        final likedDoc = await db
-            .collection('likes')
-            .doc('${user.uid}_${widget.noteId}')
-            .get();
-        final bookmarkedDoc = await db
-            .collection('bookmarks')
-            .doc('${user.uid}_${widget.noteId}')
-            .get();
-        isLiked = likedDoc.exists;
-        isBookmarked = bookmarkedDoc.exists;
+        try {
+          final likedDoc = await db
+              .collection('likes')
+              .doc('${user.uid}_${widget.noteId}')
+              .get();
+          final bookmarkedDoc = await db
+              .collection('bookmarks')
+              .doc('${user.uid}_${widget.noteId}')
+              .get();
+          isLiked = likedDoc.exists;
+          isBookmarked = bookmarkedDoc.exists;
+        } catch (_) {}
       }
 
       if (mounted) {
@@ -107,7 +123,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
           _isBookmarked = isBookmarked;
           _isLoading = false;
         });
-        
+
         // Log note view
         ref.read(analyticsServiceProvider).logNoteView(note.noteId, note.title);
       }
@@ -213,31 +229,25 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     setState(() => _isDownloading = true);
 
     try {
-      // Increment Firestore download counter
-      await ref
-          .read(firestoreServiceProvider)
-          .incrementDownloads(widget.noteId, 'note');
+      // Increment Firestore download counter safely
+      try {
+        await ref
+            .read(firestoreServiceProvider)
+            .incrementDownloads(widget.noteId, 'note');
+      } catch (_) {}
 
       // Log to analytics
       ref.read(analyticsServiceProvider).logNoteDownload(widget.noteId, _note!.title);
 
-      // Save PDF reference to local storage for offline access
-      final dir = await getApplicationDocumentsDirectory();
-      final metaFile = File('${dir.path}/downloads_meta.txt');
-
-      // Download actual PDF bytes
-      final response = await http.get(Uri.parse(_note!.pdfUrl));
-      if (response.statusCode != 200) throw Exception('Failed to download PDF files');
-      final cleanSubject = _note!.subject.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-      final cleanTitle = _note!.title.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
-      final fileName = '${cleanSubject}_$cleanTitle.pdf';
-      final pdfFile = File('${dir.path}/$fileName');
-      await pdfFile.writeAsBytes(response.bodyBytes);
-
-      // Append download record
-      final entry =
-          '${_note!.noteId}|||${_note!.title}|||${pdfFile.path}|||${_note!.course}|||${_note!.semester}\n';
-      await metaFile.writeAsString(entry, mode: FileMode.append);
+      final pdfUrl = _note!.pdfUrl;
+      if (pdfUrl.isNotEmpty) {
+        final uri = Uri.parse(pdfUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          await launchUrl(uri, mode: LaunchMode.platformDefault);
+        }
+      }
 
       if (mounted) {
         setState(() {
@@ -258,23 +268,10 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
           );
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(children: [
-              Icon(Icons.download_done_rounded, color: Colors.white),
-              SizedBox(width: 8),
-              Expanded(child: Text('Saved for offline reading!')),
-            ]),
-            action: SnackBarAction(
-              label: 'Open',
-              textColor: Colors.white,
-              onPressed: () {
-                OpenFile.open(pdfFile.path);
-              },
-            ),
+          const SnackBar(
+            content: Text('Opening PDF document... 📄'),
             backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: Duration(seconds: 2),
           ),
         );
       }

@@ -28,10 +28,11 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _initDefaultPlayer();
   }
 
   void _initDefaultPlayer() {
+    if (_youtubeController != null) return;
+
     String? firstVideoId;
     CourseModule? firstModule;
 
@@ -47,7 +48,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       }
     }
 
-    // 2. Guaranteed fallback video ID per category (prevents Error 152-4 from loadPlaylist)
+    // 2. Guaranteed fallback video ID per category
     if (firstVideoId == null) {
       final title = widget.course.title.toLowerCase();
       if (title.contains('python')) {
@@ -148,6 +149,12 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
   // ─── Playback & App Launcher ───────────────────────────────────────────────
 
   void _playVideo(CourseModule module) {
+    final isEnrolled = ref.read(enrollmentProvider).contains(widget.course.id);
+    if (!isEnrolled) {
+      _promptEnrollment();
+      return;
+    }
+
     String? videoId = _extractVideoId(module.youtubeVideoId);
 
     if (videoId == null || videoId.length != 11) {
@@ -178,10 +185,48 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
       _activeModule = module;
     });
 
+    // Mark module as completed in progress tracker
+    ref.read(courseProgressProvider.notifier).toggleModuleCompleted(widget.course.id, module.id);
+
     _tabController.animateTo(1);
   }
 
+  void _promptEnrollment() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(
+          children: [
+            Icon(Icons.lock_rounded, color: Colors.white, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Please Enroll first to unlock video lessons and track progress! 🎓',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'ENROLL NOW',
+          textColor: Colors.amber,
+          onPressed: () {
+            ref.read(enrollmentProvider.notifier).enroll(widget.course.id);
+            _initDefaultPlayer();
+            setState(() {});
+          },
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   void _playFullPlaylist() {
+    final isEnrolled = ref.read(enrollmentProvider).contains(widget.course.id);
+    if (!isEnrolled) {
+      _promptEnrollment();
+      return;
+    }
+
     if (_displayModules.isNotEmpty) {
       _playVideo(_displayModules.first);
     } else {
@@ -219,6 +264,14 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final enrolledIds = ref.watch(enrollmentProvider);
+    final isEnrolled = enrolledIds.contains(widget.course.id);
+    final completedModulesSet = ref.watch(courseProgressProvider)[widget.course.id] ?? {};
+
+    if (isEnrolled && _youtubeController == null) {
+      _initDefaultPlayer();
+    }
+
     final double screenWidth = MediaQuery.of(context).size.width;
     final double headerHeight = (screenWidth * 9 / 16).clamp(210.0, 360.0);
 
@@ -228,7 +281,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
             SliverAppBar(
-              expandedHeight: _activeModule == null ? headerHeight : null,
+              expandedHeight: (isEnrolled && _activeModule == null) ? headerHeight : null,
               pinned: true,
               stretch: true,
               backgroundColor: AppColors.primary,
@@ -242,73 +295,75 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                       style:
                           const TextStyle(color: Colors.white, fontSize: 16))
                   : null,
-              flexibleSpace: _activeModule == null
-                  ? FlexibleSpaceBar(
-                      background: Hero(
-                        tag: 'course_image_${widget.course.id}',
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Container(color: Colors.black),
-                            Image.network(
-                              widget.course.thumbnailUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                color: AppColors.surfaceLowest,
-                                child: const Center(
-                                    child: Icon(Icons.image_not_supported,
-                                        color: Colors.white, size: 48)),
-                              ),
-                            ),
-                            Container(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Colors.black.withValues(alpha: 0.6),
-                                    Colors.transparent,
-                                    Colors.black.withValues(alpha: 0.4),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.lightImpact();
-                                  if (_displayModules.isNotEmpty) {
-                                    _playVideo(_displayModules.first);
-                                  } else {
-                                    _playFullPlaylist();
-                                  }
-                                },
-                                child: Container(
-                                  width: 72,
-                                  height: 72,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.3),
-                                        blurRadius: 20,
-                                        spreadRadius: 2,
-                                      ),
-                                    ],
+              flexibleSpace: !isEnrolled
+                  ? FlexibleSpaceBar(background: _buildLockedHeader(headerHeight))
+                  : (_activeModule == null
+                      ? FlexibleSpaceBar(
+                          background: Hero(
+                            tag: 'course_image_${widget.course.id}',
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Container(color: Colors.black),
+                                Image.network(
+                                  widget.course.thumbnailUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                    color: AppColors.surfaceLowest,
+                                    child: const Center(
+                                        child: Icon(Icons.image_not_supported,
+                                            color: Colors.white, size: 48)),
                                   ),
-                                  child: const Icon(Icons.play_arrow_rounded,
-                                      size: 44, color: AppColors.primary),
                                 ),
-                              ),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.black.withValues(alpha: 0.6),
+                                        Colors.transparent,
+                                        Colors.black.withValues(alpha: 0.4),
+                                      ],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                    ),
+                                  ),
+                                ),
+                                Center(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.lightImpact();
+                                      if (_displayModules.isNotEmpty) {
+                                        _playVideo(_displayModules.first);
+                                      } else {
+                                        _playFullPlaylist();
+                                      }
+                                    },
+                                    child: Container(
+                                      width: 72,
+                                      height: 72,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.9),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.3),
+                                            blurRadius: 20,
+                                            spreadRadius: 2,
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(Icons.play_arrow_rounded,
+                                          size: 44, color: AppColors.primary),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : null,
-              bottom: _activeModule != null
+                          ),
+                        )
+                      : null),
+              bottom: (isEnrolled && _activeModule != null)
                   ? PreferredSize(
                       preferredSize: Size.fromHeight(headerHeight),
                       child: Container(
@@ -388,65 +443,71 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                                 .copyWith(color: AppColors.textSecondary)),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    Consumer(
-                      builder: (context, ref, child) {
-                        final enrolledIds = ref.watch(enrollmentProvider);
-                        final isEnrolled = enrolledIds.contains(widget.course.id);
 
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  if (!isEnrolled) {
-                                    ref.read(enrollmentProvider.notifier).enroll(widget.course.id);
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              'Enrolled! Go to Videos tab to start learning. 🎓')),
-                                    );
-                                    _tabController.animateTo(1);
-                                  } else {
-                                    if (_displayModules.isNotEmpty) {
-                                      _playVideo(_displayModules.first);
-                                    } else {
-                                      _playFullPlaylist();
-                                    }
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16)),
-                                ),
-                                child: Text(
-                                    isEnrolled ? 'Start Learning' : 'Enroll Now',
+                    // ── Progress Card & Watch Time Tracker ──────────────────
+                    if (isEnrolled) _buildProgressCard(completedModulesSet),
+
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (!isEnrolled) {
+                                ref.read(enrollmentProvider.notifier).enroll(widget.course.id);
+                                _initDefaultPlayer();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text(
+                                          'Course Enrolled! Video lessons unlocked. 🎓')),
+                                );
+                                setState(() {});
+                                _tabController.animateTo(1);
+                              } else {
+                                if (_displayModules.isNotEmpty) {
+                                  _playVideo(_displayModules.first);
+                                } else {
+                                  _playFullPlaylist();
+                                }
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isEnrolled ? const Color(0xFF10B981) : AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(isEnrolled ? Icons.play_arrow_rounded : Icons.school_rounded, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                    isEnrolled ? 'Start Learning' : 'Enroll Now (Free)',
                                     style: const TextStyle(
                                         fontSize: 16, fontWeight: FontWeight.bold)),
-                              ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                final target = _activeModule?.youtubeVideoId ?? widget.course.youtubePlaylistUrl;
-                                _openInYoutubeApp(target);
-                              },
-                              icon: const Icon(Icons.open_in_new_rounded, size: 18),
-                              label: const Text('YouTube'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final target = _activeModule?.youtubeVideoId ?? widget.course.youtubePlaylistUrl;
+                            _openInYoutubeApp(target);
+                          },
+                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          label: const Text('YouTube'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                   ],
@@ -505,10 +566,12 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                             color: AppColors.primary),
                       ),
                       const SizedBox(width: 16),
-                      Text(
-                        widget.course.channelName,
-                        style: AppTextStyles.labelMedium.copyWith(
-                            fontSize: 16, fontWeight: FontWeight.w700),
+                      Expanded(
+                        child: Text(
+                          widget.course.channelName,
+                          style: AppTextStyles.labelMedium.copyWith(
+                              fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ],
                   ),
@@ -524,7 +587,7 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                     padding: const EdgeInsets.all(20),
                     itemCount: _displayModules.length,
                     itemBuilder: (context, index) {
-                      return _buildModuleTile(_displayModules[index], index);
+                      return _buildModuleTile(_displayModules[index], index, isEnrolled, completedModulesSet);
                     },
                   );
                 }
@@ -570,9 +633,9 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
                                           HapticFeedback.lightImpact();
                                           _playFullPlaylist();
                                         },
-                                        icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                                        label: const Text('Play Course Video in App',
-                                            style: TextStyle(fontWeight: FontWeight.bold)),
+                                        icon: Icon(isEnrolled ? Icons.play_arrow_rounded : Icons.lock_rounded, size: 28),
+                                        label: Text(isEnrolled ? 'Play Course Video in App' : 'Enroll to Play Video',
+                                            style: const TextStyle(fontWeight: FontWeight.bold)),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.primary,
                                           foregroundColor: Colors.white,
@@ -696,32 +759,210 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
     );
   }
 
-  Widget _buildModuleTile(CourseModule module, int index) {
+  Widget _buildLockedHeader(double height) {
+    return Container(
+      height: height,
+      width: double.infinity,
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            widget.course.thumbnailUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(color: AppColors.primary),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.black.withValues(alpha: 0.85),
+                  Colors.black.withValues(alpha: 0.65),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
+                    ),
+                    child: const Icon(Icons.lock_rounded, color: Colors.white, size: 36),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Enroll to Unlock Video Lessons',
+                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Get full access to all lessons & progress tracking',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(enrollmentProvider.notifier).enroll(widget.course.id);
+                      _initDefaultPlayer();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Course Enrolled! Video lessons unlocked. 🎓')),
+                      );
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.school_rounded, size: 18),
+                    label: const Text('Enroll Now (Free)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(Set<String> completedModulesSet) {
+    final int totalModules = _displayModules.isNotEmpty ? _displayModules.length : 1;
+    final int completedCount = completedModulesSet.length;
+    final double percent = (completedCount / totalModules).clamp(0.0, 1.0);
+
+    double totalHours = 10.0;
+    final durText = widget.course.duration.replaceAll(RegExp(r'[^0-9.]'), '');
+    if (durText.isNotEmpty) {
+      totalHours = double.tryParse(durText) ?? 10.0;
+    }
+
+    final double watchedHours = (percent * totalHours);
+    final double remainingHours = (totalHours - watchedHours).clamp(0.0, totalHours);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.analytics_rounded, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text('Course Progress', style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${(percent * 100).toInt()}% Done',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: percent,
+              minHeight: 8,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded, color: Colors.green, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$completedCount of $totalModules Lessons',
+                    style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.access_time_rounded, color: AppColors.textSecondary, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${watchedHours.toStringAsFixed(1)}h watched • ${remainingHours.toStringAsFixed(1)}h left',
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModuleTile(CourseModule module, int index, bool isEnrolled, Set<String> completedSet) {
     final isPlaying = _activeModule?.id == module.id;
+    final isCompleted = completedSet.contains(module.id);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: isPlaying
             ? AppColors.primary.withValues(alpha: 0.05)
-            : Colors.white,
+            : (isCompleted ? Colors.green.withValues(alpha: 0.04) : Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: isPlaying ? AppColors.primary : AppColors.border),
+            color: isPlaying
+                ? AppColors.primary
+                : (isCompleted ? Colors.green.shade300 : AppColors.border)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: isPlaying
-                ? AppColors.primary
-                : AppColors.primary.withValues(alpha: 0.1),
+            color: !isEnrolled
+                ? Colors.grey.shade200
+                : (isPlaying
+                    ? AppColors.primary
+                    : (isCompleted ? Colors.green.shade100 : AppColors.primary.withValues(alpha: 0.1))),
             shape: BoxShape.circle,
           ),
           child: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-            color: isPlaying ? Colors.white : AppColors.primary,
+            !isEnrolled
+                ? Icons.lock_rounded
+                : (isPlaying ? Icons.pause_rounded : (isCompleted ? Icons.check_rounded : Icons.play_arrow_rounded)),
+            color: !isEnrolled
+                ? Colors.grey.shade600
+                : (isPlaying ? Colors.white : (isCompleted ? Colors.green.shade800 : AppColors.primary)),
             size: 20,
           ),
         ),
@@ -735,6 +976,18 @@ class _CourseDetailScreenState extends ConsumerState<CourseDetailScreen>
         subtitle: module.duration.isNotEmpty
             ? Text('${module.duration} min', style: AppTextStyles.bodySmall)
             : null,
+        trailing: isEnrolled
+            ? IconButton(
+                icon: Icon(
+                  isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                  color: isCompleted ? Colors.green : Colors.grey.shade400,
+                ),
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(courseProgressProvider.notifier).toggleModuleCompleted(widget.course.id, module.id);
+                },
+              )
+            : const Icon(Icons.lock_outline_rounded, color: Colors.grey, size: 20),
         onTap: () {
           HapticFeedback.lightImpact();
           _playVideo(module);
