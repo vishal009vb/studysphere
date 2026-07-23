@@ -81,6 +81,7 @@ flutter_native_splash:
   web: false
   android_12:
     color: "#7B72E9"
+    image: "assets/splash_logo.png"
     background_image: "assets/splash_bg.png"
 
 flutter_launcher_icons:

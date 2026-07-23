@@ -230,13 +230,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _navigate() async {
     try {
+      // Remove OS native splash as soon as Flutter SplashUI is painted
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        FlutterNativeSplash.remove();
+      });
+
+      // Display full-screen splash screen for 1.2s for clean branding experience
+      await Future.delayed(const Duration(milliseconds: 1200));
+
       // Await auth state stream to resolve logged in status
       final user = await ref.read(authStateProvider.future);
 
       if (!mounted) return;
 
       if (user == null || !user.emailVerified) {
-        FlutterNativeSplash.remove();
         context.go('/login');
         return;
       }
@@ -247,7 +254,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
       if (!mounted) return;
 
-      FlutterNativeSplash.remove();
       if (userProfile.coursePreference.isEmpty) {
         context.go('/onboarding');
       } else {
@@ -255,7 +261,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       }
     } catch (_) {
       if (mounted) {
-        FlutterNativeSplash.remove();
         context.go('/onboarding');
       }
     }
