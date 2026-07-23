@@ -76,14 +76,12 @@ flutter:
 flutter_native_splash:
   color: "#7B72E9"
   background_image: "assets/splash_bg.png"
-  image: "assets/splash_logo.png"
   android: true
   ios: true
   web: false
   android_12:
     color: "#7B72E9"
     background_image: "assets/splash_bg.png"
-    image: "assets/splash_logo.png"
 
 flutter_launcher_icons:
   android: "launcher_icon"

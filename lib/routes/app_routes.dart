@@ -225,44 +225,39 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    // Remove native splash — Flutter Frame 0 is now painted (seamless transition)
-    FlutterNativeSplash.remove();
-    // Cache logo to avoid pop-in
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      precacheImage(const AssetImage('assets/logo.png'), context);
-    });
     _navigate();
   }
 
   Future<void> _navigate() async {
-    // Fast splash navigation (200ms)
-    await Future.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
-
     try {
-      // Await the auth state stream to ensure we have the latest resolved state
+      // Await auth state stream to resolve logged in status
       final user = await ref.read(authStateProvider.future);
-      
+
       if (!mounted) return;
 
       if (user == null || !user.emailVerified) {
+        FlutterNativeSplash.remove();
         context.go('/login');
         return;
       }
-      
+
       final firestoreService = ref.read(firestoreServiceProvider);
       final userProfile = await firestoreService.getUserProfile(user.uid);
       ref.read(currentUserModelProvider.notifier).state = userProfile;
 
       if (!mounted) return;
 
+      FlutterNativeSplash.remove();
       if (userProfile.coursePreference.isEmpty) {
         context.go('/onboarding');
       } else {
         context.go('/home');
       }
     } catch (_) {
-      if (mounted) context.go('/onboarding');
+      if (mounted) {
+        FlutterNativeSplash.remove();
+        context.go('/onboarding');
+      }
     }
   }
 
