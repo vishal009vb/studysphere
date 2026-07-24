@@ -235,8 +235,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         FlutterNativeSplash.remove();
       });
 
-      // Display user image splash screen for 1.5 seconds (1500ms)
-      await Future.delayed(const Duration(milliseconds: 1500));
+      // Ultra-fast launch (100ms = 0.1s) matching fast production apps
+      await Future.delayed(const Duration(milliseconds: 100));
 
       // Await auth state stream to resolve logged in status
       final user = await ref.read(authStateProvider.future);

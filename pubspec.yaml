@@ -70,17 +70,20 @@ flutter:
     - assets/images/banners/
     - assets/animations/
     - assets/logo.png
+    - assets/splash_logo.png
     - assets/splash_bg.png
     - assets/locations.json
 
 flutter_native_splash:
-  color: "#7B72E9"
+  color: "#FFFFFF"
   background_image: "assets/splash_bg.png"
+  image: "assets/splash_logo.png"
   android: true
   ios: true
   web: false
   android_12:
-    color: "#7B72E9"
+    color: "#FFFFFF"
+    image: "assets/splash_logo.png"
     background_image: "assets/splash_bg.png"
 
 flutter_launcher_icons:
