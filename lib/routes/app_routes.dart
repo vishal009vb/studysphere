@@ -230,16 +230,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _navigate() async {
     try {
-      // Remove OS native splash as soon as Flutter SplashUI is painted
+      // Remove OS native splash immediately on frame 0 paint (0.05s instant dismissal)
       WidgetsBinding.instance.addPostFrameCallback((_) {
         FlutterNativeSplash.remove();
       });
 
-      // Ultra-fast launch (100ms = 0.1s) matching fast production apps
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Await auth state stream to resolve logged in status
-      final user = await ref.read(authStateProvider.future);
+      final user = ref.read(authServiceProvider).currentUser;
 
       if (!mounted) return;
 
@@ -248,17 +244,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         return;
       }
 
+      // Fetch user profile asynchronously in background (non-blocking for splash)
       final firestoreService = ref.read(firestoreServiceProvider);
-      final userProfile = await firestoreService.getUserProfile(user.uid);
-      ref.read(currentUserModelProvider.notifier).state = userProfile;
+      firestoreService.getUserProfile(user.uid).then((userProfile) {
+        if (mounted) {
+          ref.read(currentUserModelProvider.notifier).state = userProfile;
+        }
+      }).catchError((_) {});
 
       if (!mounted) return;
 
-      if (userProfile.coursePreference.isEmpty) {
-        context.go('/onboarding');
-      } else {
-        context.go('/home');
-      }
+      context.go('/home');
     } catch (_) {
       if (mounted) {
         context.go('/onboarding');

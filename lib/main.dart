@@ -41,12 +41,10 @@ Future<void> _initFirebase() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Sync 10 core courses provided by user
-    try {
-      await seedUserProvidedCourses();
-    } catch (e) {
+    // Sync core courses asynchronously in background (non-blocking for instant app launch)
+    seedUserProvidedCourses().catchError((e) {
       debugPrint('Course seeding skipped: $e');
-    }
+    });
 
     // App Check (Mobile only in dev)
     if (!kIsWeb) {
