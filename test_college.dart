@@ -32,8 +32,8 @@ void main() async {
   final List<dynamic> jsonList = jsonDecode(response.body);
   final allColleges = jsonList.map((e) => CollegeData.fromJson(e)).toList();
 
-  final lowerState = 'maharashtra';
-  final lowerDistrict = 'jalgaon';
+  const lowerState = 'maharashtra';
+  const lowerDistrict = 'jalgaon';
 
   final filtered = allColleges.where((c) {
     final cState = c.state.toLowerCase();

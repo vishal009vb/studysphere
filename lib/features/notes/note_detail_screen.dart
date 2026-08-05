@@ -14,7 +14,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import '../../services/analytics_service.dart';
-import 'package:open_file/open_file.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class NoteDetailScreen extends ConsumerStatefulWidget {
@@ -241,11 +240,26 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
 
       final pdfUrl = _note!.pdfUrl;
       if (pdfUrl.isNotEmpty) {
-        final uri = Uri.parse(pdfUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        // Download PDF file bytes to local disk storage
+        final dir = await getApplicationDocumentsDirectory();
+        final sanitizedTitle = _note!.title.replaceAll(RegExp(r'[^\w\s\.-]'), '_');
+        final filePath = '${dir.path}/${sanitizedTitle}_${_note!.noteId}.pdf';
+        final file = File(filePath);
+
+        final res = await http.get(Uri.parse(pdfUrl));
+        if (res.statusCode == 200) {
+          await file.writeAsBytes(res.bodyBytes);
+
+          // Save metadata entry for Offline Downloads screen
+          final metaFile = File('${dir.path}/downloads_meta.txt');
+          final line = '${_note!.noteId}|||${_note!.title}|||$pdfUrl|||${_note!.course}|||${_note!.semester}\n';
+          await metaFile.writeAsString(line, mode: FileMode.append);
         } else {
-          await launchUrl(uri, mode: LaunchMode.platformDefault);
+          // Fallback launch if network download returns non-200
+          final uri = Uri.parse(pdfUrl);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
         }
       }
 
@@ -269,17 +283,17 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Opening PDF document... 📄'),
+            content: Text('Downloaded & saved to Offline Downloads! 📄'),
             backgroundColor: AppColors.success,
-            duration: Duration(seconds: 2),
+            duration: Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: $e'),
+          const SnackBar(
+            content: Text('Download failed. Please check internet connection.'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -379,6 +393,8 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                   ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               onPressed: () async {
                 final user = ref.read(authServiceProvider).currentUser;
+                final navigator = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
                 await ref.read(firestoreServiceProvider).createReport(
                       ReportModel(
                         reportId:
@@ -394,14 +410,12 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
 
                 ref.read(analyticsServiceProvider).logReportContent(widget.noteId, 'note');
 
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Report submitted. Thank you!'),
-                        backgroundColor: AppColors.success),
-                  );
-                }
+                navigator.pop();
+                messenger.showSnackBar(
+                  const SnackBar(
+                      content: Text('Report submitted. Thank you!'),
+                      backgroundColor: AppColors.success),
+                );
               },
               child: const Text('Submit Report'),
             ),
@@ -527,7 +541,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                           children: [
                             CircleAvatar(
                               radius: 20,
-                              backgroundColor: AppColors.primary.withOpacity(0.1),
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                               backgroundImage: _uploaderProfile!.photoUrl.isNotEmpty ? NetworkImage(_uploaderProfile!.photoUrl) : null,
                               child: _uploaderProfile!.photoUrl.isEmpty ? Text(_uploaderProfile!.name.isNotEmpty ? _uploaderProfile!.name[0].toUpperCase() : '?', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)) : null,
                             ),
@@ -542,7 +556,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                                 ],
                               ),
                             ),
-                            Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
+                            const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 20),
                           ],
                         ),
                       ),
@@ -613,7 +627,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: _isLiked
-                            ? AppColors.error.withOpacity(0.08)
+                            ? AppColors.error.withValues(alpha: 0.08)
                             : AppColors.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
@@ -653,16 +667,16 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.05),
+                      color: AppColors.error.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.error.withOpacity(0.2)),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.info_outline_rounded, color: AppColors.error, size: 20),
+                            const Icon(Icons.info_outline_rounded, color: AppColors.error, size: 20),
                             const SizedBox(width: 8),
                             Text(
                               'Disclaimer',
@@ -698,7 +712,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
@@ -748,10 +762,10 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
             16, 12, 16, MediaQuery.of(context).viewInsets.bottom + 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.border)),
+          border: const Border(top: BorderSide(color: AppColors.border)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, -4),
             ),
@@ -802,9 +816,9 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.4)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
       ),
       child: Text(
         subject,
@@ -874,7 +888,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
               ? []
               : [
                   BoxShadow(
-                    color: color.withOpacity(0.3),
+                    color: color.withValues(alpha: 0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -903,7 +917,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
         children: [
           CircleAvatar(
             radius: 18,
-            backgroundColor: AppColors.primary.withOpacity(0.12),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.12),
             backgroundImage: comment.authorPhotoUrl.isNotEmpty
                 ? NetworkImage(comment.authorPhotoUrl)
                 : null,
@@ -912,7 +926,7 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
                     comment.authorName.isNotEmpty
                         ? comment.authorName[0].toUpperCase()
                         : '?',
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: AppColors.primary, fontWeight: FontWeight.bold),
                   )
                 : null,
@@ -924,9 +938,9 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: AppColors.surface,
-                    borderRadius: const BorderRadius.only(
+                    borderRadius: BorderRadius.only(
                       topRight: Radius.circular(16),
                       bottomLeft: Radius.circular(16),
                       bottomRight: Radius.circular(16),

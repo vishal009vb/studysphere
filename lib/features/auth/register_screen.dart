@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../models/college_model.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../services/location_service.dart';
 import '../../services/college_service.dart';
 import 'widgets/college_search_dialog.dart';
@@ -21,13 +21,20 @@ class RegisterScreen extends ConsumerStatefulWidget {
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _autoValidate = false;
+  bool _termsAccepted = false;
   int _currentStep = 1;
+
+  // Username check
+  bool _isCheckingUsername = false;
+  bool? _usernameAvailable;
+  Timer? _usernameDebounce;
 
   String? _selectedState;
   String? _selectedDistrict;
@@ -37,7 +44,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   List<String> _states = [];
   List<String> _districts = [];
   List<String> _talukas = [];
-  
+
   Timer? _debounce;
   final TextEditingController _collegeSearchController = TextEditingController();
   final TextEditingController _collegeDisplayController = TextEditingController();
@@ -53,6 +60,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadStates();
+      ref.read(collegeServiceProvider).searchColleges(limit: 1);
     });
   }
 
@@ -99,26 +107,58 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  void _onUsernameChanged(String value) {
+    _usernameDebounce?.cancel();
+    final cleaned = value.trim().toLowerCase();
+    if (cleaned.length < 3) {
+      setState(() { _usernameAvailable = null; _isCheckingUsername = false; });
+      return;
+    }
+    final regex = RegExp(r'^[a-z0-9_.]+$');
+    if (!regex.hasMatch(cleaned)) {
+      setState(() { _usernameAvailable = null; _isCheckingUsername = false; });
+      return;
+    }
+    setState(() => _isCheckingUsername = true);
+    _usernameDebounce = Timer(const Duration(milliseconds: 600), () async {
+      try {
+        final available = await ref.read(firestoreServiceProvider).isUsernameAvailable(cleaned);
+        if (mounted) setState(() { _usernameAvailable = available; _isCheckingUsername = false; });
+      } catch (_) {
+        if (mounted) setState(() { _usernameAvailable = null; _isCheckingUsername = false; });
+      }
+    });
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _collegeSearchController.dispose();
     _collegeDisplayController.dispose();
     _debounce?.cancel();
+    _usernameDebounce?.cancel();
     super.dispose();
   }
 
   Future<void> _handleRegister() async {
     setState(() => _autoValidate = true);
     if (!_formKey.currentState!.validate()) return;
-    
+
+    if (!_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please accept the Terms & Conditions to continue')),
+      );
+      return;
+    }
+
     if (_selectedState == null || _selectedDistrict == null || _selectedTaluka == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select State, District, and Taluka')));
       return;
     }
-    
+
     if (_selectedCollege == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select your College')));
       return;
@@ -126,15 +166,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // Final username availability check before submitting
+      final username = _usernameController.text.trim().toLowerCase();
+      final available = await ref.read(firestoreServiceProvider).isUsernameAvailable(username);
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Username is already taken. Please choose another.'), backgroundColor: Colors.red),
+          );
+          setState(() { _isLoading = false; _currentStep = 1; });
+        }
+        return;
+      }
+
       final authService = ref.read(authServiceProvider);
       await authService.signUpWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         name: _nameController.text.trim(),
+        username: username,
         state: _selectedState!,
         district: _selectedDistrict!,
         taluka: _selectedTaluka!,
-        collegeId: _selectedCollege!.college, // Using name as ID if no unique ID
+        collegeId: _selectedCollege!.college,
         collegeName: _selectedCollege!.college,
       );
       if (mounted) {
@@ -203,7 +257,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-      value: value,
+      initialValue: value,
       items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
       onChanged: onChanged,
       validator: (val) => val == null ? 'Required' : null,
@@ -232,10 +286,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 child: AnimatedTransition.slideUp(
                   Card(
                     elevation: 0,
-                    color: Colors.white.withOpacity(0.95),
+                    color: Colors.white.withValues(alpha: 0.95),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24),
-                      side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1.5),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(24.0),
@@ -266,10 +320,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             const SizedBox(height: 8),
                             Text('Step $_currentStep of 2', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
                             const SizedBox(height: 24),
-                            
+
                             if (_currentStep == 1) ...[
+                              // Full Name
                               TextFormField(
                                 controller: _nameController,
+                                textCapitalization: TextCapitalization.words,
                                 decoration: const InputDecoration(
                                   labelText: 'Full Name',
                                   prefixIcon: Icon(Icons.person_outline),
@@ -277,6 +333,51 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 validator: (value) => value == null || value.isEmpty ? 'Enter your name' : null,
                               ),
                               const SizedBox(height: 16),
+
+                              // Username field with live availability check
+                              TextFormField(
+                                controller: _usernameController,
+                                onChanged: _onUsernameChanged,
+                                decoration: InputDecoration(
+                                  labelText: 'Username',
+                                  hintText: 'e.g. vishal_123',
+                                  prefixIcon: const Icon(Icons.alternate_email_rounded),
+                                  suffixIcon: _isCheckingUsername
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(12),
+                                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                                        )
+                                      : _usernameAvailable == null
+                                          ? null
+                                          : Icon(
+                                              _usernameAvailable! ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                              color: _usernameAvailable! ? Colors.green : Colors.red,
+                                            ),
+                                  helperText: _usernameAvailable == null
+                                      ? 'Lowercase letters, numbers, _ and . only'
+                                      : _usernameAvailable!
+                                          ? '✓ Username is available'
+                                          : '✗ Username already taken',
+                                  helperStyle: TextStyle(
+                                    color: _usernameAvailable == null
+                                        ? Colors.grey
+                                        : _usernameAvailable!
+                                            ? Colors.green
+                                            : Colors.red,
+                                  ),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) return 'Username is required';
+                                  if (value.trim().length < 3) return 'At least 3 characters required';
+                                  final regex = RegExp(r'^[a-z0-9_.]+$');
+                                  if (!regex.hasMatch(value.trim().toLowerCase())) return 'Lowercase letters, numbers, _ and . only';
+                                  if (_usernameAvailable == false) return 'Username already taken';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Email
                               TextFormField(
                                 controller: _emailController,
                                 keyboardType: TextInputType.emailAddress,
@@ -298,6 +399,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 },
                               ),
                               const SizedBox(height: 16),
+
+                              // Password
                               TextFormField(
                                 controller: _passwordController,
                                 obscureText: _obscurePassword,
@@ -311,10 +414,81 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 ),
                                 validator: (value) => value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
+
+                              // Terms & Conditions checkbox
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: _termsAccepted
+                                      ? AppColors.primary.withValues(alpha: 0.06)
+                                      : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _termsAccepted
+                                        ? AppColors.primary.withValues(alpha: 0.4)
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Checkbox(
+                                      value: _termsAccepted,
+                                      activeColor: AppColors.primary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                      onChanged: (val) => setState(() => _termsAccepted = val ?? false),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(top: 10.0),
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.4),
+                                            children: const [
+                                              TextSpan(text: 'I agree to the '),
+                                              TextSpan(
+                                                text: 'Terms & Conditions',
+                                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                              ),
+                                              TextSpan(text: ' and '),
+                                              TextSpan(
+                                                text: 'Privacy Policy',
+                                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                              ),
+                                              TextSpan(text: '. My data is processed as per the '),
+                                              TextSpan(
+                                                text: 'Digital Personal Data Protection Act, 2023 (India)',
+                                                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
+                                              ),
+                                              TextSpan(text: '.'),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+
+                              // Next button
                               ElevatedButton(
                                 onPressed: () {
                                   setState(() => _autoValidate = true);
+                                  if (!_termsAccepted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please accept Terms & Conditions')),
+                                    );
+                                    return;
+                                  }
+                                  if (_usernameAvailable == false) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Please choose a different username')),
+                                    );
+                                    return;
+                                  }
                                   if (_formKey.currentState!.validate()) {
                                     setState(() {
                                       _currentStep = 2;

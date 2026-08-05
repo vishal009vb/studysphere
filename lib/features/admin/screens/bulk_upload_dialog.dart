@@ -7,7 +7,6 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../services/firestore_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../core/utils/pdf_classifier.dart';
@@ -40,13 +39,11 @@ class _UploadItem {
     this.year = '',
     this.status = 'pending',
     this.confidence = 0,
-    this.uploadState = 'waiting',
-    this.errorMessage = '',
-  });
+  }) : uploadState = 'waiting', errorMessage = '';
 }
 
 class _BulkUploadDialogState extends ConsumerState<BulkUploadDialog> {
-  List<_UploadItem> _items = [];
+  final List<_UploadItem> _items = [];
   bool _isUploading = false;
   int _completedCount = 0;
 
@@ -73,8 +70,6 @@ class _BulkUploadDialogState extends ConsumerState<BulkUploadDialog> {
             if (classification.subject != null) confidence += 40;
             if (classification.semester != null || classification.year != null) confidence += 20;
 
-            String determinedType = classification.type ?? (widget.uploadType == 'Notes' ? 'Notes' : 'Paper');
-
             _items.add(_UploadItem(
               file: platformFile,
               course: classification.course ?? '',
@@ -88,7 +83,9 @@ class _BulkUploadDialogState extends ConsumerState<BulkUploadDialog> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error picking files: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error picking files: $e')));
+      }
     }
   }
 

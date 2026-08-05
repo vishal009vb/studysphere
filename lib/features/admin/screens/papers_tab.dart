@@ -141,13 +141,13 @@ class _PapersTabState extends ConsumerState<PapersTab> {
       _loadPapers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Paper \$decision successfully.'), backgroundColor: AppColors.success),
+          const SnackBar(content: Text('Paper \$decision successfully.'), backgroundColor: AppColors.success),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -175,7 +175,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -211,13 +211,13 @@ class _PapersTabState extends ConsumerState<PapersTab> {
       _loadPapers();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Bulk \$action successful.'), backgroundColor: AppColors.success),
+          const SnackBar(content: Text('Bulk \$action successful.'), backgroundColor: AppColors.success),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -256,7 +256,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                     const SizedBox(width: 8),
                     DropdownButton<String>(
                       value: _searchField,
-                      items: ['title', 'subject'].map((e) => DropdownMenuItem(value: e, child: Text('By \$e'))).toList(),
+                      items: ['title', 'subject'].map((e) => DropdownMenuItem(value: e, child: const Text('By \$e'))).toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setState(() => _searchField = val);
@@ -267,7 +267,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _filterCourse,
+                        initialValue: _filterCourse,
                         decoration: const InputDecoration(labelText: 'Course', border: OutlineInputBorder()),
                         items: ['All', 'BCA', 'Global']
                             .map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
@@ -282,7 +282,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _filterStatus,
+                        initialValue: _filterStatus,
                         decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder()),
                         items: ['All', 'Pending', 'Approved', 'Rejected']
                             .map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
@@ -301,10 +301,10 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                     child: Row(
                       children: [
-                        Text('\${_selectedIds.length} items selected', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('\${_selectedIds.length} items selected', style: TextStyle(fontWeight: FontWeight.bold)),
                         const Spacer(),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.check, size: 16),
@@ -352,7 +352,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
-                              headingRowColor: MaterialStateProperty.all(AppColors.surface),
+                              headingRowColor: WidgetStateProperty.all(AppColors.surface),
                               onSelectAll: (selected) {
                                 setState(() {
                                   if (selected == true) {
@@ -410,7 +410,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: isApproved ? AppColors.success.withOpacity(0.1) : AppColors.warning.withOpacity(0.1),
+                                            color: isApproved ? AppColors.success.withValues(alpha: 0.1) : AppColors.warning.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
@@ -446,7 +446,7 @@ class _PapersTabState extends ConsumerState<PapersTab> {
                                       ),
                                     ],
                                   );
-                                }).toList(),
+                                }),
                                 if (_isFetchingMore)
                                   const DataRow(cells: [
                                     DataCell(CircularProgressIndicator()),

@@ -84,10 +84,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 padding: const EdgeInsets.all(24.0),
                 child: Card(
                   elevation: 0,
-                  color: Colors.white.withOpacity(0.92),
+                  color: Colors.white.withValues(alpha: 0.92),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1.5),
+                    side: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 1.5),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24.0),

@@ -127,7 +127,7 @@ class _LegalTabState extends ConsumerState<LegalTab> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
+              color: AppColors.primary.withValues(alpha: 0.05),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
               border: const Border(bottom: BorderSide(color: AppColors.border)),
             ),

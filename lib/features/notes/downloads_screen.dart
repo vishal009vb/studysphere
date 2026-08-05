@@ -124,9 +124,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         await metaFile.writeAsString(filtered.join('\n'));
       }
 
-      // Remove actual PDF if it exists
-      final pdfFile = File('${dir.path}/${entry.noteId}.pdf');
-      if (await pdfFile.exists()) await pdfFile.delete();
+      // Remove actual PDF if it exists (check both naming conventions)
+      final sanitizedTitle = entry.title.replaceAll(RegExp(r'[^\w\s\.-]'), '_');
+      final pdfFile1 = File('${dir.path}/${entry.noteId}.pdf');
+      final pdfFile2 = File('${dir.path}/${sanitizedTitle}_${entry.noteId}.pdf');
+      if (await pdfFile1.exists()) await pdfFile1.delete();
+      if (await pdfFile2.exists()) await pdfFile2.delete();
 
       setState(() => _downloads.removeWhere((e) => e.noteId == entry.noteId));
 
@@ -179,10 +182,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
       final metaFile = File('${dir.path}/downloads_meta.txt');
       if (await metaFile.exists()) await metaFile.delete();
 
-      // Delete all cached PDF files
+      // Delete all cached PDF files (check both naming conventions)
       for (final entry in _downloads) {
-        final pdfFile = File('${dir.path}/${entry.noteId}.pdf');
-        if (await pdfFile.exists()) await pdfFile.delete();
+        final sanitizedTitle = entry.title.replaceAll(RegExp(r'[^\w\s\.-]'), '_');
+        final pdfFile1 = File('${dir.path}/${entry.noteId}.pdf');
+        final pdfFile2 = File('${dir.path}/${sanitizedTitle}_${entry.noteId}.pdf');
+        if (await pdfFile1.exists()) await pdfFile1.delete();
+        if (await pdfFile2.exists()) await pdfFile2.delete();
       }
 
       setState(() => _downloads = []);
@@ -374,7 +380,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(7),
       ),
       child: Text(
@@ -399,7 +405,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               width: 110,
               height: 110,
               decoration: BoxDecoration(
-                color: AppColors.warning.withOpacity(0.1),
+                color: AppColors.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(30),
               ),
               child: const Icon(

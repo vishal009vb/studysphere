@@ -296,7 +296,7 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.1),
+              color: AppColors.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.lock_clock_rounded,
@@ -314,10 +314,10 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.05),
+                color: AppColors.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppColors.primary.withOpacity(0.2)),
+                    color: AppColors.primary.withValues(alpha: 0.2)),
               ),
               child: Row(children: [
                 const Icon(Icons.wb_sunny_rounded,
@@ -372,7 +372,7 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
             Text('Unlock unlimited AI Study Buddy prompts and early access to new features!', style: AppTextStyles.bodyMedium, textAlign: TextAlign.center),
             const SizedBox(height: 32),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary.withOpacity(0.6), padding: const EdgeInsets.symmetric(vertical: 16)),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary.withValues(alpha: 0.6), padding: const EdgeInsets.symmetric(vertical: 16)),
               onPressed: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Premium Plan is Coming Soon!')));
@@ -383,13 +383,14 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
               onPressed: () {
+                final rootMessenger = ScaffoldMessenger.of(context);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ad Loading... (Simulation)')));
+                rootMessenger.showSnackBar(const SnackBar(content: Text('Ad Loading... (Simulation)')));
                 // Simulate ad watch
                 Future.delayed(const Duration(seconds: 2), () {
                   if (mounted) {
                     ref.read(_remainingQuotaProvider.notifier).state += 5;
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Received 5 bonus AI prompts!')));
+                    rootMessenger.showSnackBar(const SnackBar(content: Text('Received 5 bonus AI prompts!')));
                   }
                 });
               },
@@ -527,13 +528,13 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: remaining == 0
-                    ? Colors.red.withOpacity(0.2)
-                    : Colors.white.withOpacity(0.15),
+                    ? Colors.red.withValues(alpha: 0.2)
+                    : Colors.white.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: remaining == 0
-                      ? Colors.redAccent.withOpacity(0.5)
-                      : Colors.white.withOpacity(0.3),
+                      ? Colors.redAccent.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(children: [
@@ -560,10 +561,10 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.1),
+                color: AppColors.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                    color: AppColors.success.withOpacity(0.3)),
+                    color: AppColors.success.withValues(alpha: 0.3)),
               ),
               child: Row(children: [
                 const Icon(Icons.all_inclusive_rounded,
@@ -762,10 +763,10 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
+        border: const Border(top: BorderSide(color: AppColors.border)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xff7c3aed).withOpacity(0.06),
+            color: const Color(0xff7c3aed).withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, -4),
           ),
@@ -781,7 +782,7 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: isDisabled ? AppColors.error.withOpacity(0.1) : AppColors.primary.withOpacity(0.1),
+                color: isDisabled ? AppColors.error.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -819,7 +820,7 @@ class _AIAssistantScreenState extends ConsumerState<AIAssistantScreen>
               border: Border.all(color: AppColors.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
+                  color: Colors.black.withValues(alpha: 0.02),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -945,7 +946,7 @@ class _MessageBubble extends StatelessWidget {
                     color: isUser
                         ? AppColors.primary
                         : isError
-                            ? AppColors.error.withOpacity(0.08)
+                            ? AppColors.error.withValues(alpha: 0.08)
                             : Colors.white,
                     borderRadius: BorderRadius.only(
                       topLeft: Radius.circular(isUser ? 16 : 6),
@@ -957,7 +958,7 @@ class _MessageBubble extends StatelessWidget {
                         ? null
                         : Border.all(
                             color: isError
-                                ? AppColors.error.withOpacity(0.3)
+                                ? AppColors.error.withValues(alpha: 0.3)
                                 : const Color(0xFFE4E2FF),
                             width: 1.5,
                           ),
@@ -1021,12 +1022,6 @@ class _MessageBubble extends StatelessWidget {
     );
   }
 
-  String _formatTime(DateTime dt) {
-    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-    final m = dt.minute.toString().padLeft(2, '0');
-    final ampm = dt.hour < 12 ? 'AM' : 'PM';
-    return '$h:$m $ampm';
-  }
 }
 
 // ─── Typing Indicator ─────────────────────────────────────────────────────────

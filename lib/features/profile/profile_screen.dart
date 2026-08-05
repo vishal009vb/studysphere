@@ -1,10 +1,10 @@
 import 'dart:io';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shimmer/shimmer.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
@@ -12,14 +12,18 @@ import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/storage_service.dart';
+import '../../services/location_service.dart';
+import '../../services/college_service.dart';
 import '../../models/user_model.dart';
 import '../../models/note_model.dart';
-import '../upload/upload_bottom_sheet.dart';
 import '../courses/courses_list_screen.dart';
 import '../courses/course_detail_screen.dart';
 import '../courses/providers/course_provider.dart';
+import '../auth/widgets/college_search_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/widgets/animated_transition.dart';
+import 'follow_list_screen.dart';
+import 'package:share_plus/share_plus.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -36,6 +40,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   List<Map<String, dynamic>> _bookmarks = [];
   late TabController _tabController;
   bool _isUploadingAvatar = false;
+  StreamSubscription<DocumentSnapshot>? _profileSubscription;
 
   @override
   void initState() {
@@ -47,12 +52,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _profileSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _loadProfileData() async {
     final user = ref.read(authServiceProvider).currentUser;
     if (user == null) return;
+
+    // Listen to real-time updates for profile counts/data
+    _profileSubscription?.cancel();
+    _profileSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen((doc) {
+      if (doc.exists && mounted) {
+        final profile = UserModel.fromMap(doc.data()!);
+        setState(() {
+          _profile = profile;
+        });
+        ref.read(currentUserModelProvider.notifier).state = profile;
+      }
+    });
 
     try {
       final svc = ref.read(firestoreServiceProvider);
@@ -103,9 +125,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       });
 
       if (mounted) {
-        ref.read(currentUserModelProvider.notifier).state = profile;
         setState(() {
-          _profile = profile;
           _myUploads = myUploads;
           _bookmarks = bookmarks;
           _isLoading = false;
@@ -123,6 +143,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   Future<void> _uploadAvatar() async {
+    // Image upload via File path is not supported on web
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Photo upload is only available on the mobile app')),
+      );
+      return;
+    }
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
@@ -136,7 +163,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         
         if (user != null) {
           final storageSvc = ref.read(storageServiceProvider);
-          final firestoreSvc = ref.read(firestoreServiceProvider);
           
           final imageUrl = await storageSvc.uploadImage(file, user.uid);
           
@@ -201,10 +227,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.warning.withOpacity(0.1),
+                color: AppColors.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: AppColors.warning.withOpacity(0.3)),
+                    color: AppColors.warning.withValues(alpha: 0.3)),
               ),
               child: Text(
                 '⚠️ By upgrading, you agree to only upload original educational content. Spam or duplicates will lead to a permanent ban.',
@@ -222,17 +248,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           ElevatedButton.icon(
             onPressed: () async {
               final svc = ref.read(firestoreServiceProvider);
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
               await svc.updateUserProfile(
                   _profile!.uid, {'role': 'contributor'});
-              if (mounted) {
-                Navigator.pop(context);
-                _loadProfileData();
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text(
-                      '🎉 Congratulations! You are now a Contributor!'),
-                  backgroundColor: AppColors.success,
-                ));
-              }
+              navigator.pop();
+              if (mounted) _loadProfileData();
+              messenger.showSnackBar(const SnackBar(
+                content: Text(
+                    '🎉 Congratulations! You are now a Contributor!'),
+                backgroundColor: AppColors.success,
+              ));
             },
             icon: const Icon(Icons.stars_rounded),
             label: const Text('Accept & Upgrade'),
@@ -270,45 +296,209 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
     }
   }
 
-  void _showEditCourseDialog() {
-    final courseController = TextEditingController(text: _profile?.coursePreference);
-    
+  void _showQrCodeDialog() {
+    if (_profile == null) return;
+    final profileUrl = "https://studysphere-app-3a480.web.app/user/${_profile!.username.isNotEmpty ? _profile!.username : _profile!.uid}";
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Edit Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: courseController,
-              decoration: const InputDecoration(
-                labelText: 'Course / Degree',
-                hintText: 'e.g. B.Sc Computer Science',
-                prefixIcon: Icon(Icons.school_rounded),
-              ),
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            const Text('Note: To change your location or college, please contact support or re-register for now.', style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final newCourse = courseController.text.trim();
-              if (newCourse.isNotEmpty && _profile != null) {
-                await ref.read(firestoreServiceProvider).updateUserProfile(_profile!.uid, {'coursePreference': newCourse});
-                _loadProfileData();
-                if (context.mounted) Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Save'),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Profile QR Code',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                const SizedBox(height: 20),
+                CircleAvatar(
+                  radius: 36,
+                  backgroundColor: AppColors.primary,
+                  backgroundImage: _profile!.photoUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(_profile!.photoUrl)
+                      : null,
+                  child: _profile!.photoUrl.isEmpty
+                      ? Text(
+                          _profile!.name.isNotEmpty ? _profile!.name[0].toUpperCase() : '?',
+                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                        )
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _profile!.name,
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '@${_profile!.username.isNotEmpty ? _profile!.username : _profile!.name.toLowerCase().replaceAll(' ', '_')}',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: CachedNetworkImage(
+                    imageUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(profileUrl)}&color=7C72E8',
+                    width: 180,
+                    height: 180,
+                    fit: BoxFit.contain,
+                    placeholder: (context, url) => const SizedBox(
+                      width: 180,
+                      height: 180,
+                      child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 180,
+                      height: 180,
+                      color: Colors.grey.shade100,
+                      child: const Icon(Icons.qr_code_2_rounded, size: 80, color: AppColors.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Scan to view study profile',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  void _showMoreOptionsBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
+      backgroundColor: Colors.white,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Account Settings',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.support_agent_rounded, color: Colors.teal),
+                  title: const Text('Contact Support'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/contact');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.privacy_tip_rounded, color: Colors.blueGrey),
+                  title: const Text('Privacy Policy'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/privacy');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.description_rounded, color: Colors.indigo),
+                  title: const Text('Terms & Conditions'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/terms');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
+                  title: const Text('Delete Account'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/delete-account');
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.logout_rounded, color: AppColors.error),
+                  title: const Text('Sign Out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _signOut();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -317,18 +507,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
+      return const Scaffold(
         body: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.all(24.0),
           child: Column(
             children: [
-              const SizedBox(height: 64),
+              SizedBox(height: 64),
               SkeletonLoader(width: 120, height: 120, borderRadius: 60),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               SkeletonLoader(width: 150, height: 24, borderRadius: 12),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               SkeletonLoader(width: 100, height: 16, borderRadius: 8),
-              const SizedBox(height: 32),
+              SizedBox(height: 32),
               SkeletonLoader(width: double.infinity, height: 200, borderRadius: 16),
             ],
           ),
@@ -370,34 +560,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
       backgroundColor: AppColors.background,
       body: NestedScrollView(
         headerSliverBuilder: (context, _) => [
+          SliverToBoxAdapter(
+            child: _buildProfileHero(),
+          ),
           SliverAppBar(
             pinned: true,
-            expandedHeight: 310,
+            toolbarHeight: 0,
             backgroundColor: AppColors.background,
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-                onPressed: _signOut,
-                tooltip: 'Sign Out',
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.parallax,
-              background: _buildProfileHero(),
-            ),
             bottom: TabBar(
               controller: _tabController,
               isScrollable: true,
               indicatorColor: AppColors.primary,
               indicatorWeight: 3,
+              indicatorSize: TabBarIndicatorSize.label,
+              dividerColor: Colors.transparent,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
-              labelStyle: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 13),
-              tabs: const [
-                Tab(text: 'Overview'),
-                Tab(text: 'Uploads'),
-                Tab(text: 'Bookmarks'),
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.grid_view_rounded, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Overview', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_upload_outlined, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Uploads', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.bookmark_border_rounded, size: 16),
+                      const SizedBox(width: 6),
+                      Text('Bookmarks', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -416,207 +625,542 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
   Widget _buildProfileHero() {
     return Container(
-      color: AppColors.background,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF3F2FF), Color(0xFFE8E5FF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 12),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 4),
-                child: Text(
-                  'Profile',
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: AppColors.shadowLevel1,
-                ),
-                child: Column(
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Top Header Title & Actions ─────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Stack(
-                      children: [
-                        GestureDetector(
-                          onTap: _isUploadingAvatar ? null : _uploadAvatar,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(24),
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF7C72E8), Color(0xFFB8B2FF)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                ),
-                                child: _profile!.photoUrl.isEmpty
-                                    ? Center(
-                                        child: Text(
-                                          _profile!.name.isNotEmpty ? _profile!.name[0].toUpperCase() : '?',
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 32,
-                                              fontWeight: FontWeight.w900),
-                                        ),
-                                      )
-                                    : ClipRRect(
-                                        borderRadius: BorderRadius.circular(24),
-                                        child: Image.network(_profile!.photoUrl, fit: BoxFit.cover),
-                                      ),
-                              ),
-                              if (_isUploadingAvatar)
-                                Container(
-                                  width: 80,
-                                  height: 80,
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.4),
-                                    borderRadius: BorderRadius.circular(24),
-                                  ),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(color: Colors.white),
-                                  ),
-                                ),
-                              if (!_isUploadingAvatar)
-                                Positioned(
-                                  bottom: -4,
-                                  right: -4,
-                                  child: GestureDetector(
-                                    onTap: _showEditProfileDialog,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     Text(
-                      _profile!.name,
-                      style: const TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 20,
+                      'Profile',
+                      style: GoogleFonts.outfit(
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'B.Tech · Computer Science · 2nd Year',
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_profile!.role == 'contributor')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF3F2FF),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('⭐ ', style: TextStyle(fontSize: 12)),
-                            Text(
-                              'Top Contributor',
-                              style: TextStyle(
-                                color: Color(0xFF7C72E8),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                    Row(
+                      children: [
+                        // QR Code Scanner Button
+                        GestureDetector(
+                          onTap: _showQrCodeDialog,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
+                            child: const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              size: 20,
+                              color: Color(0xFF7C72E8),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        // More Options Button
+                        GestureDetector(
+                          onTap: _showMoreOptionsBottomSheet,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.more_horiz_rounded,
+                              size: 20,
+                              color: Color(0xFF7C72E8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 14),
+
+                // ── Main Profile Card ──────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF7C72E8).withValues(alpha: 0.06),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left side: Large Profile Photo
+                          GestureDetector(
+                            onTap: _isUploadingAvatar ? null : _uploadAvatar,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF7C72E8).withValues(alpha: 0.15),
+                                        blurRadius: 12,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: const Color(0xFF7C72E8).withValues(alpha: 0.3),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: _profile!.photoUrl.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              _profile!.name.isNotEmpty ? _profile!.name[0].toUpperCase() : '?',
+                                              style: GoogleFonts.outfit(
+                                                color: const Color(0xFF7C72E8),
+                                                fontSize: 36,
+                                                fontWeight: FontWeight.w900,
+                                              ),
+                                            ),
+                                          )
+                                        : ClipRRect(
+                                            borderRadius: BorderRadius.circular(100),
+                                            child: CachedNetworkImage(
+                                              imageUrl: _profile!.photoUrl,
+                                              fit: BoxFit.cover,
+                                              width: 100,
+                                              height: 100,
+                                              errorWidget: (_, __, ___) => Center(
+                                                child: Text(
+                                                  _profile!.name.isNotEmpty ? _profile!.name[0].toUpperCase() : '?',
+                                                  style: GoogleFonts.outfit(
+                                                    color: const Color(0xFF7C72E8),
+                                                    fontSize: 36,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                                if (_isUploadingAvatar)
+                                  Container(
+                                    width: 100,
+                                    height: 100,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.4),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(color: Colors.white),
+                                    ),
+                                  ),
+                                if (!_isUploadingAvatar)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF7C72E8),
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black12,
+                                            blurRadius: 4,
+                                          )
+                                        ],
+                                      ),
+                                      child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Right side: Name, Username, Metadata & Bio
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        _profile!.name,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (_profile!.isVerified) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(
+                                        Icons.verified_rounded,
+                                        color: Color(0xFF7C72E8),
+                                        size: 16,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '@${_profile!.username.isNotEmpty ? _profile!.username : _profile!.name.toLowerCase().replaceAll(' ', '_')}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: const Color(0xFF7C72E8),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                
+                                // School / Degree
+                                if (_profile!.coursePreference.isNotEmpty)
+                                  _buildMetadataRow(Icons.school_outlined, _profile!.coursePreference),
+                                // Semester
+                                if (_profile!.semester.isNotEmpty)
+                                  _buildMetadataRow(Icons.book_outlined, _profile!.semester),
+                                // College Name
+                                if (_profile!.collegeName.isNotEmpty)
+                                  _buildMetadataRow(Icons.account_balance_outlined, _profile!.collegeName),
+                                // Location
+                                if (_profile!.state.isNotEmpty)
+                                  _buildMetadataRow(
+                                    Icons.location_on_outlined,
+                                    _profile!.district.isNotEmpty
+                                        ? '${_profile!.district}, ${_profile!.state}'
+                                        : _profile!.state,
+                                  ),
+                                
+                                const SizedBox(height: 8),
+
+                                // Bio bullet lines
+                                if (_profile!.bio.isNotEmpty)
+                                  ..._profile!.bio.split('\n').map((line) {
+                                    if (line.trim().isEmpty) return const SizedBox.shrink();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        line.trim(),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      // Edit and Share buttons row
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _showEditProfileDialog,
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF7C72E8), Color(0xFF9F97F2)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF7C72E8).withValues(alpha: 0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.edit_outlined, color: Colors.white, size: 16),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Edit Profile',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _shareProfile,
+                              child: Container(
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFF7C72E8).withValues(alpha: 0.5), width: 1.2),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.share_outlined, color: Color(0xFF7C72E8), size: 16),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Share Profile',
+                                      style: GoogleFonts.outfit(
+                                        color: const Color(0xFF7C72E8),
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // ── Stats Card ─────────────────────────────────────────
+                _buildStatsCard(),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  Widget _buildMetadataRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: AppColors.textSecondary.withValues(alpha: 0.8)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsCard() {
+    final stats = [
+      {
+        'label': 'Notes',
+        'value': '${_myUploads.length}',
+        'color': const Color(0xFF7C72E8),
+        'bgColor': const Color(0xFFF3F2FF),
+        'icon': Icons.description_rounded,
+      },
+      {
+        'label': 'Followers',
+        'value': '${_profile!.followersCount}',
+        'color': const Color(0xFF3B82F6),
+        'bgColor': const Color(0xFFEFF6FF),
+        'icon': Icons.people_alt_rounded,
+      },
+      {
+        'label': 'Following',
+        'value': '${_profile!.followingCount}',
+        'color': const Color(0xFF22C55E),
+        'bgColor': const Color(0xFFF0FDF4),
+        'icon': Icons.person_rounded,
+      },
+      {
+        'label': 'Reputation',
+        'value': '${_profile!.reputationPoints}',
+        'color': const Color(0xFFF59E0B),
+        'bgColor': const Color(0xFFFEF3C7),
+        'icon': Icons.shield_rounded,
+      },
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C72E8).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _buildStatItem(stats[0]),
+          _buildStatDivider(),
+          _buildStatItem(stats[1]),
+          _buildStatDivider(),
+          _buildStatItem(stats[2]),
+          _buildStatDivider(),
+          _buildStatItem(stats[3]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatDivider() {
+    return Container(
+      width: 1,
+      height: 40,
+      color: AppColors.border.withValues(alpha: 0.6),
+    );
+  }
+
+  Widget _buildStatItem(Map<String, dynamic> s) {
+    final label = s['label'] as String;
+    final isClickable = label == 'Followers' || label == 'Following';
+    return Expanded(
+      child: InkWell(
+        onTap: isClickable
+            ? () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FollowListScreen(
+                      userId: _profile!.uid,
+                      initialTab: label == 'Followers' ? 0 : 1,
+                      userName: _profile!.name,
+                    ),
+                  ),
+                ).then((_) => _loadProfileData());
+              }
+            : null,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: s['bgColor'] as Color,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(s['icon'] as IconData, color: s['color'] as Color, size: 20),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              s['value'] as String,
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareProfile() {
+    if (_profile == null) return;
+    final profileUrl = "https://studysphere-app-3a480.web.app/user/${_profile!.username.isNotEmpty ? _profile!.username : _profile!.uid}";
+    final shareText = "Hey! Check out my profile on StudySphere 🎓\n\n"
+        "👤 Name: ${_profile!.name}\n"
+        "🏷️ Username: @${_profile!.username.isNotEmpty ? _profile!.username : _profile!.name.toLowerCase().replaceAll(' ', '_')}\n"
+        "📖 Course: ${_profile!.coursePreference} ${_profile!.semester.isNotEmpty ? '(${_profile!.semester})' : ''}\n"
+        "${_profile!.collegeName.isNotEmpty ? '🏫 College: ${_profile!.collegeName}\n' : ''}"
+        "\n🔗 Profile Link: $profileUrl\n"
+        "\nJoin me on StudySphere to share notes and prepare together! ✨";
+    Share.share(shareText);
+  }
+
   // ── Overview Tab ──────────────────────────────────────────────────────────
 
   Widget _buildOverviewTab() {
-    // ── Figma-style 4-stat grid data ────────────────────────────
-    final stats = [
-      {'label': 'Notes',  'value': '${_myUploads.length}',           'color': AppColors.primary},
-      {'label': 'Solved', 'value': '${_profile!.reputationPoints}',  'color': AppColors.blue},
-      {'label': 'Streak', 'value': '5d',                             'color': AppColors.secondary},
-      {'label': 'Rank',   'value': '#${_profile!.followersCount + 1}','color': AppColors.tertiary},
-    ];
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Figma 4-stat grid ──────────────────────────────────
-          GridView.count(
-            crossAxisCount: 4,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 0.85,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: stats.map((s) => Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-                boxShadow: AppColors.shadowLevel1,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    s['value'] as String,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      color: s['color'] as Color,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    s['label'] as String,
-                    style: AppTextStyles.bodySmall.copyWith(fontSize: 10),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            )).toList(),
-          ),
-
-          const SizedBox(height: 20),
-
           // ── My Courses section (Figma style) ──────────────────
           Text('My Courses',
               style: GoogleFonts.outfit(
@@ -636,7 +1180,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     border: Border.all(color: AppColors.border),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
+                        color: Colors.black.withValues(alpha: 0.02),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
@@ -647,7 +1191,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
+                          color: AppColors.primary.withValues(alpha: 0.1),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.school_rounded, color: AppColors.primary, size: 28),
@@ -693,7 +1237,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                       border: Border.all(color: AppColors.border),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.primary.withOpacity(0.04),
+                          color: AppColors.primary.withValues(alpha: 0.04),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -755,7 +1299,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
+                              color: AppColors.primary.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.arrow_forward_ios_rounded, color: AppColors.primary, size: 16),
@@ -839,7 +1383,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.warning.withOpacity(0.3),
+                      color: AppColors.warning.withValues(alpha: 0.3),
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),
@@ -877,27 +1421,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
 
           // Quick links
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Quick Links', style: AppTextStyles.headingSmall),
-              TextButton.icon(
-                onPressed: () => _showEditProfileDialog(),
-                icon: const Icon(Icons.edit_rounded, size: 18),
-                label: const Text('Edit Details'),
-              ),
-            ],
-          ),
+          Text('Quick Links', style: AppTextStyles.headingSmall),
           const SizedBox(height: 12),
-          _buildQuickLink(Icons.folder_special_rounded, 'My Offline Downloads',
-              '/offline-downloads', AppColors.accent),
-          const SizedBox(height: 8),
           if (_profile!.role == 'contributor' || _profile!.role == 'admin') ...[
             _buildQuickLink(Icons.cloud_upload_rounded, 'My Uploads',
                 '/my-uploads', AppColors.primary),
             const SizedBox(height: 8),
           ],
-          _buildQuickLink(Icons.download_done_rounded, 'My Downloads',
+          _buildQuickLink(Icons.download_done_rounded, 'My Offline Downloads',
               '/downloads', AppColors.warning),
           const SizedBox(height: 8),
           _buildQuickLink(Icons.quiz_rounded, 'Question Papers',
@@ -907,30 +1438,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               Icons.forum_rounded, 'Community Feed', '/community', const Color(0xff7c3aed)),
           const SizedBox(height: 24),
           Text('Support & Legal', style: AppTextStyles.headingSmall),
-          const SizedBox(height: 12),
-          _buildQuickLink(Icons.support_agent_rounded, 'Contact Support',
-              '/contact', Colors.teal),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.privacy_tip_rounded, 'Privacy Policy',
-              '/privacy', Colors.blueGrey),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.description_rounded, 'Terms & Conditions',
-              '/terms', Colors.blueGrey),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.people_rounded, 'Community Guidelines',
-              '/community-guidelines', const Color(0xFF7C3AED)),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.copyright_rounded, 'Copyright Policy',
-              '/copyright-policy', Colors.deepOrange),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.smart_toy_rounded, 'AI Disclaimer',
-              '/ai-disclaimer', AppColors.blue),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.folder_special_rounded, 'Content Disclaimer',
-              '/content-disclaimer', Colors.teal),
-          const SizedBox(height: 8),
-          _buildQuickLink(Icons.delete_forever_rounded, 'Delete Account',
-              '/delete-account', AppColors.error),
+          const SizedBox(height: 10),
+          // Compact 2-column grid for legal items
+          GridView.count(
+            crossAxisCount: 2,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 3.2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _buildCompactLink(Icons.support_agent_rounded, 'Contact Support', '/contact', Colors.teal),
+              _buildCompactLink(Icons.privacy_tip_rounded, 'Privacy Policy', '/privacy', Colors.blueGrey),
+              _buildCompactLink(Icons.description_rounded, 'Terms & Conditions', '/terms', Colors.indigo),
+              _buildCompactLink(Icons.people_rounded, 'Community Rules', '/community-guidelines', const Color(0xFF7C3AED)),
+              _buildCompactLink(Icons.copyright_rounded, 'Copyright Policy', '/copyright-policy', Colors.deepOrange),
+              _buildCompactLink(Icons.smart_toy_rounded, 'AI Disclaimer', '/ai-disclaimer', AppColors.blue),
+              _buildCompactLink(Icons.folder_special_rounded, 'Content Disclaimer', '/content-disclaimer', Colors.teal),
+              _buildCompactLink(Icons.delete_forever_rounded, 'Delete Account', '/delete-account', AppColors.error),
+            ],
+          ),
           if (_profile?.role == 'admin') ...[
             const SizedBox(height: 24),
             Text('Admin Center', style: AppTextStyles.headingSmall),
@@ -988,7 +1515,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -1027,8 +1554,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             const SizedBox(width: 14),
             Text(label, style: AppTextStyles.headingSmall.copyWith(fontSize: 14)),
             const Spacer(),
-            Icon(Icons.chevron_right_rounded,
+            const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactLink(IconData icon, String label, String route, Color color) {
+    return GestureDetector(
+      onTap: () => context.push(route),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
           ],
         ),
       ),
@@ -1049,7 +1608,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
+                  color: AppColors.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(28),
                 ),
                 child: const Icon(Icons.upload_rounded,
@@ -1112,7 +1671,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.picture_as_pdf_rounded,
@@ -1136,7 +1695,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
+                            color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -1151,13 +1710,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
                     ),
                     const SizedBox(height: 4),
                     Row(children: [
-                      Icon(Icons.download_rounded,
+                      const Icon(Icons.download_rounded,
                           size: 13, color: AppColors.textSecondary),
                       const SizedBox(width: 3),
                       Text('${note.downloads}',
                           style: AppTextStyles.bodySmall),
                       const SizedBox(width: 12),
-                      Icon(Icons.favorite_rounded,
+                      const Icon(Icons.favorite_rounded,
                           size: 13, color: AppColors.error),
                       const SizedBox(width: 3),
                       Text('${note.likes}', style: AppTextStyles.bodySmall),
@@ -1204,7 +1763,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.08),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(28),
               ),
               child: const Icon(Icons.bookmark_border_rounded,
@@ -1301,78 +1860,367 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
   }
 
   void _showEditProfileDialog() {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController(text: _profile!.name);
+    final usernameController = TextEditingController(text: _profile!.username);
+    final bioController = TextEditingController(text: _profile!.bio);
+    final courseController = TextEditingController(text: _profile!.coursePreference);
+    final collegeDisplayController = TextEditingController(text: _profile!.collegeName);
+
+    // Location state
+    String? selectedState = _profile!.state.isNotEmpty ? _profile!.state : null;
+    String? selectedDistrict = _profile!.district.isNotEmpty ? _profile!.district : null;
+    String? selectedTaluka = _profile!.subDistrict.isNotEmpty ? _profile!.subDistrict : null;
+    CollegeData? selectedCollege;
+    List<String> states = [];
+    List<String> districts = [];
+    List<String> talukas = [];
+    String updatedGender = _profile!.gender.isEmpty ? 'female' : _profile!.gender;
+    String? selectedSemester = _profile!.semester.isNotEmpty ? _profile!.semester : null;
+    bool isSaving = false;
+
+    final locationSvc = ref.read(locationServiceProvider);
+
+    Widget buildApiDropdown({
+      required String label,
+      required String? value,
+      required List<String> items,
+      required void Function(String?) onChanged,
+      IconData? icon,
+    }) {
+      return DropdownButtonFormField<String>(
+        initialValue: items.contains(value) ? value : null,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon ?? Icons.arrow_drop_down),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        items: items
+            .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis)))
+            .toList(),
+        onChanged: onChanged,
+        isExpanded: true,
+      );
+    }
+
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
-        String updatedState = _profile!.state;
-        String updatedDistrict = _profile!.district;
-        String updatedTaluka = _profile!.subDistrict;
-        String updatedCollege = _profile!.collegeName;
-        String updatedGender = _profile!.gender;
-        
-        return AlertDialog(
-          title: const Text('Edit Profile'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  initialValue: updatedState,
-                  decoration: const InputDecoration(labelText: 'State'),
-                  onChanged: (val) => updatedState = val,
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Load states on first build
+            if (states.isEmpty) {
+              locationSvc.getStates().then((s) {
+                if (context.mounted) setDialogState(() => states = s);
+              });
+            }
+
+            // Pre-load districts/talukas if already selected
+            if (selectedState != null && districts.isEmpty) {
+              locationSvc.getDistricts(selectedState!).then((d) {
+                if (context.mounted) {
+                  setDialogState(() => districts = d);
+                  if (selectedDistrict != null) {
+                    locationSvc.getTalukas(selectedState!, selectedDistrict!).then((t) {
+                      if (context.mounted) setDialogState(() => talukas = t);
+                    });
+                  }
+                }
+              });
+            }
+
+            Future<void> onStateChanged(String? newState) async {
+              setDialogState(() {
+                selectedState = newState;
+                selectedDistrict = null;
+                selectedTaluka = null;
+                districts = [];
+                talukas = [];
+              });
+              if (newState != null) {
+                final d = await locationSvc.getDistricts(newState);
+                if (context.mounted) setDialogState(() => districts = d);
+              }
+            }
+
+            Future<void> onDistrictChanged(String? newDistrict) async {
+              setDialogState(() {
+                selectedDistrict = newDistrict;
+                selectedTaluka = null;
+                talukas = [];
+              });
+              if (newDistrict != null && selectedState != null) {
+                final t = await locationSvc.getTalukas(selectedState!, newDistrict);
+                if (context.mounted) setDialogState(() => talukas = t);
+              }
+            }
+
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.edit_rounded, color: AppColors.primary),
+                  SizedBox(width: 8),
+                  Text('Edit Profile'),
+                ],
+              ),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.9,
+                child: Form(
+                  key: formKey,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextFormField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Display Name',
+                            prefixIcon: Icon(Icons.person_rounded),
+                          ),
+                          validator: (val) =>
+                              (val == null || val.trim().isEmpty) ? 'Name is required' : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: usernameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Username',
+                            prefixIcon: Icon(Icons.alternate_email_rounded),
+                          ),
+                          validator: (val) {
+                            if (val == null || val.trim().isEmpty) return 'Username is required';
+                            if (val.trim().length < 3) return 'Must be at least 3 characters';
+                            final regex = RegExp(r'^[a-z0-9_.]+$');
+                            if (!regex.hasMatch(val.trim().toLowerCase())) {
+                              return 'Lowercase letters, numbers, _ and . only';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: bioController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Bio',
+                            prefixIcon: Icon(Icons.info_outline_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: TextFormField(
+                                controller: courseController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Course (e.g. BCA)',
+                                  prefixIcon: Icon(Icons.school_rounded),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: selectedSemester,
+                                decoration: const InputDecoration(
+                                  labelText: 'Semester',
+                                  prefixIcon: Icon(Icons.timeline_rounded),
+                                  border: OutlineInputBorder(),
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                ),
+                                items: List.generate(8, (i) {
+                                  final sem = 'Sem ${i + 1}';
+                                  return DropdownMenuItem(value: sem, child: Text(sem));
+                                }),
+                                onChanged: (val) => setDialogState(() => selectedSemester = val),
+                                isExpanded: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: updatedGender,
+                          decoration: const InputDecoration(
+                            labelText: 'Gender',
+                            prefixIcon: Icon(Icons.wc_rounded),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'female', child: Text('Female')),
+                            DropdownMenuItem(value: 'male', child: Text('Male')),
+                            DropdownMenuItem(value: 'other', child: Text('Other')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) setDialogState(() => updatedGender = val);
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 8, bottom: 12),
+                            child: Text(
+                              'Location & College',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        buildApiDropdown(
+                          label: 'State',
+                          value: selectedState,
+                          items: states,
+                          icon: Icons.map_rounded,
+                          onChanged: (val) => onStateChanged(val),
+                        ),
+                        const SizedBox(height: 12),
+                        buildApiDropdown(
+                          label: 'District',
+                          value: selectedDistrict,
+                          items: districts,
+                          icon: Icons.location_city_rounded,
+                          onChanged: (val) => onDistrictChanged(val),
+                        ),
+                        const SizedBox(height: 12),
+                        buildApiDropdown(
+                          label: 'Taluka / Sub-district',
+                          value: selectedTaluka,
+                          items: talukas,
+                          icon: Icons.near_me_rounded,
+                          onChanged: (val) => setDialogState(() => selectedTaluka = val),
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: () async {
+                            final picked = await showCollegeSearchBottomSheet(
+                              context,
+                              ref,
+                              selectedState,
+                              selectedDistrict,
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                selectedCollege = picked;
+                                collegeDisplayController.text = picked.college;
+                              });
+                            }
+                          },
+                          child: IgnorePointer(
+                            child: TextFormField(
+                              controller: collegeDisplayController,
+                              readOnly: true,
+                              decoration: const InputDecoration(
+                                labelText: 'College',
+                                hintText: 'Tap to search college',
+                                prefixIcon: Icon(Icons.account_balance_rounded),
+                                suffixIcon: Icon(Icons.arrow_drop_down),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                TextFormField(
-                  initialValue: updatedDistrict,
-                  decoration: const InputDecoration(labelText: 'District'),
-                  onChanged: (val) => updatedDistrict = val,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
                 ),
-                TextFormField(
-                  initialValue: updatedTaluka,
-                  decoration: const InputDecoration(labelText: 'Taluka'),
-                  onChanged: (val) => updatedTaluka = val,
-                ),
-                TextFormField(
-                  initialValue: updatedCollege,
-                  decoration: const InputDecoration(labelText: 'College Name'),
-                  onChanged: (val) => updatedCollege = val,
-                ),
-                DropdownButtonFormField<String>(
-                  value: updatedGender.isEmpty ? 'female' : updatedGender,
-                  decoration: const InputDecoration(labelText: 'Gender'),
-                  items: const [
-                    DropdownMenuItem(value: 'female', child: Text('Female')),
-                    DropdownMenuItem(value: 'male', child: Text('Male')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) {
-                      updatedGender = val;
-                    }
-                  },
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          
+                          setDialogState(() => isSaving = true);
+                          
+                          try {
+                            final firestoreSvc = ref.read(firestoreServiceProvider);
+                            final targetUid = _profile!.uid;
+                            final newUsername = usernameController.text.trim().toLowerCase();
+                            final newName = nameController.text.trim();
+                            
+                            // Check username uniqueness if changed
+                            if (newUsername != _profile!.username.toLowerCase()) {
+                              final isUnique = await firestoreSvc.isUsernameUnique(newUsername);
+                              if (!isUnique) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Username is already taken. Please try another.'),
+                                      backgroundColor: AppColors.error,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                                setDialogState(() => isSaving = false);
+                                return;
+                              }
+                            }
+                            
+                            final Map<String, dynamic> updates = {
+                              'name': newName,
+                              'username': newUsername,
+                              'bio': bioController.text.trim(),
+                              'coursePreference': courseController.text.trim(),
+                              'semester': selectedSemester ?? '',
+                              'gender': updatedGender,
+                              if (selectedState != null) 'state': selectedState!,
+                              if (selectedDistrict != null) 'district': selectedDistrict!,
+                              if (selectedTaluka != null) 'subDistrict': selectedTaluka!,
+                              if (selectedCollege != null) 'collegeName': selectedCollege!.college,
+                            };
+                            
+                            await firestoreSvc.updateUserProfile(targetUid, updates);
+                            
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              _loadProfileData();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Profile updated successfully! ✨'),
+                                  backgroundColor: AppColors.success,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to update profile: $e'),
+                                  backgroundColor: AppColors.error,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                            setDialogState(() => isSaving = false);
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                final svc = ref.read(firestoreServiceProvider);
-                await svc.updateUserProfile(_profile!.uid, {
-                  'state': updatedState,
-                  'district': updatedDistrict,
-                  'subDistrict': updatedTaluka,
-                  'collegeName': updatedCollege,
-                  'gender': updatedGender,
-                });
-                if (mounted) {
-                  Navigator.pop(context);
-                  _loadProfileData();
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated!')));
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
+            );
+          },
         );
       },
     );

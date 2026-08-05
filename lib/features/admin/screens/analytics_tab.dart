@@ -53,7 +53,7 @@ class AnalyticsTab extends ConsumerWidget {
         _StatCard(title: 'Total Posts', value: '${stats['posts'] ?? 0}', icon: Icons.dynamic_feed_outlined, color: AppColors.success),
         _StatCard(title: 'Total Comments', value: '${stats['comments'] ?? 0}', icon: Icons.comment_outlined, color: AppColors.warning),
         _StatCard(title: 'Total Reports', value: '${stats['reports'] ?? 0}', icon: Icons.flag_outlined, color: AppColors.error),
-        _StatCard(title: 'Total Downloads', value: 'N/A', icon: Icons.download_outlined, color: Colors.teal),
+        const _StatCard(title: 'Total Downloads', value: 'N/A', icon: Icons.download_outlined, color: Colors.teal),
       ],
     );
   }

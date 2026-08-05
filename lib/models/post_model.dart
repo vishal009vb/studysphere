@@ -4,9 +4,11 @@ class PostModel {
   final String authorName;
   final String authorPhotoUrl;
   final String content;
-  final String attachedType; // text, image, pdf, resource, note, pyq
+  final String attachedType; // text, image, pdf, link, resource, note, pyq
   final String? attachedId;
-  final String? attachedUrl; // URL for the uploaded image or PDF
+  final String? attachedUrl; // URL for the uploaded image, PDF, or raw link
+  final String? attachedFileName; // PDF filename for display
+  final int? attachedFileSize; // PDF size in bytes for display
   final int likes;
   final int commentsCount;
   final int reposts;
@@ -22,6 +24,8 @@ class PostModel {
     this.attachedType = 'text',
     this.attachedId,
     this.attachedUrl,
+    this.attachedFileName,
+    this.attachedFileSize,
     this.likes = 0,
     this.commentsCount = 0,
     this.reposts = 0,
@@ -39,6 +43,8 @@ class PostModel {
       attachedType: map['attachedType'] ?? 'text',
       attachedId: map['attachedId'],
       attachedUrl: map['attachedUrl'],
+      attachedFileName: map['attachedFileName'],
+      attachedFileSize: map['attachedFileSize'] is int ? map['attachedFileSize'] : null,
       likes: map['likes'] ?? 0,
       commentsCount: map['commentsCount'] ?? 0,
       reposts: map['reposts'] ?? 0,
@@ -56,6 +62,8 @@ class PostModel {
       'attachedType': attachedType,
       'attachedId': attachedId,
       'attachedUrl': attachedUrl,
+      if (attachedFileName != null) 'attachedFileName': attachedFileName,
+      if (attachedFileSize != null) 'attachedFileSize': attachedFileSize,
       'likes': likes,
       'commentsCount': commentsCount,
       'reposts': reposts,

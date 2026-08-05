@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -24,6 +25,7 @@ import '../features/question_papers/question_papers_screen.dart';
 import '../features/ai_assistant/ai_assistant_screen.dart';
 import '../features/community/community_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/profile/other_user_profile_screen.dart';
 import '../features/profile/offline_downloads_screen.dart';
 import '../features/admin/admin_main_screen.dart';
 import '../features/legal/privacy_policy_screen.dart';
@@ -32,6 +34,8 @@ import '../features/legal/community_guidelines_screen.dart';
 import '../features/legal/copyright_policy_screen.dart';
 import '../features/legal/disclaimers_screen.dart';
 import '../features/legal/delete_account_screen.dart';
+import '../features/notifications/notifications_screen.dart';
+import '../features/notifications/notification_settings_screen.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import '../features/admin/admin_login_screen.dart';
@@ -42,7 +46,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
     observers: [ref.read(analyticsServiceProvider).getAnalyticsObserver()],
     redirect: (context, state) {
-      final user = ref.read(authStateProvider).value;
       final currentUser = ref.read(currentUserModelProvider);
       final location = state.matchedLocation;
 
@@ -59,22 +62,36 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // Redirect to login if not authenticated
-      if (user == null) {
+      // Wait for auth stream to emit its first value before redirecting
+      final authState = ref.read(authStateProvider);
+      if (authState.isLoading) {
+        return null;
+      }
+
+      final authUser = authState.value;
+
+      // Redirect to login if not authenticated (except for offline-allowed routes)
+      if (authUser == null) {
+        final isOfflineAllowed = location == '/' ||
+            location.startsWith('/downloads') ||
+            location.startsWith('/offline-downloads') ||
+            location.startsWith('/pdf-viewer');
+        if (isOfflineAllowed) {
+          return null;
+        }
         return isAuthRoute ? null : '/login';
       }
 
-      // Logged in but on auth page → go back to splash (it decides home vs onboarding)
+      // Logged in but on auth page → redirect to /home (or /admin)
       if (isAuthRoute) {
-        // If admin login and user is admin, go to admin
         if (location == '/admin-login' && currentUser?.role == 'admin') {
           return '/admin';
         }
-        if (!user.emailVerified) {
-          // Keep unverified email users on the auth screen so they can see verification popups
+        final isGoogleUser = authUser.providerData.any((p) => p.providerId == 'google.com');
+        if (!isGoogleUser && !authUser.emailVerified) {
           return null;
         }
-        return '/';
+        return '/home';
       }
 
       // Admin routes protection handled in AdminMainScreen directly
@@ -155,6 +172,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
+        path: '/user-profile/:id',
+        builder: (context, state) => OtherUserProfileScreen(userId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/user/:id',
+        builder: (context, state) => OtherUserProfileScreen(userId: state.pathParameters['id']!),
+      ),
+      GoRoute(
         path: '/my-uploads',
         builder: (context, state) => const MyUploadsScreen(),
       ),
@@ -206,6 +231,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/delete-account',
         builder: (context, state) => const DeleteAccountScreen(),
       ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/notification-settings',
+        builder: (context, state) => const NotificationSettingsScreen(),
+      ),
+
     ],
   );
 });
@@ -229,22 +263,38 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _navigate() async {
+    await Future.microtask(() {});
     try {
-      // Remove OS native splash immediately on frame 0 paint (0.05s instant dismissal)
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        FlutterNativeSplash.remove();
-      });
+      // Remove OS native splash immediately on frame 0 paint (mobile only)
+      if (!kIsWeb) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          FlutterNativeSplash.remove();
+        });
+      }
 
-      final user = ref.read(authServiceProvider).currentUser;
+      // Wait for Firebase Auth to finish initializing
+      while (ref.read(authStateProvider).isLoading) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
 
       if (!mounted) return;
 
-      if (user == null || !user.emailVerified) {
+      final user = ref.read(authStateProvider).value;
+
+      if (user == null) {
         context.go('/login');
         return;
       }
 
-      // Fetch user profile asynchronously in background (non-blocking for splash)
+      final isGoogleUser =
+          user.providerData.any((p) => p.providerId == 'google.com');
+
+      if (!isGoogleUser && !user.emailVerified) {
+        context.go('/login');
+        return;
+      }
+
+      // Fetch user profile asynchronously in background
       final firestoreService = ref.read(firestoreServiceProvider);
       firestoreService.getUserProfile(user.uid).then((userProfile) {
         if (mounted) {
@@ -257,7 +307,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       context.go('/home');
     } catch (_) {
       if (mounted) {
-        context.go('/onboarding');
+        context.go('/login');
       }
     }
   }

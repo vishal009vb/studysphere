@@ -119,13 +119,13 @@ class _ReportsTabState extends ConsumerState<ReportsTab> {
       _loadReports();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Report marked as \$newStatus'), backgroundColor: AppColors.success),
+          const SnackBar(content: Text('Report marked as \$newStatus'), backgroundColor: AppColors.success),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: \$e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Error: \$e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -161,7 +161,7 @@ class _ReportsTabState extends ConsumerState<ReportsTab> {
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
-                              headingRowColor: MaterialStateProperty.all(AppColors.surface),
+                              headingRowColor: WidgetStateProperty.all(AppColors.surface),
                               columns: const [
                                 DataColumn(label: Text('Type', style: TextStyle(fontWeight: FontWeight.bold))),
                                 DataColumn(label: Text('Reason', style: TextStyle(fontWeight: FontWeight.bold))),
@@ -182,7 +182,7 @@ class _ReportsTabState extends ConsumerState<ReportsTab> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: isPending ? AppColors.warning.withOpacity(0.1) : AppColors.success.withOpacity(0.1),
+                                            color: isPending ? AppColors.warning.withValues(alpha: 0.1) : AppColors.success.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
@@ -216,7 +216,7 @@ class _ReportsTabState extends ConsumerState<ReportsTab> {
                                       ),
                                     ],
                                   );
-                                }).toList(),
+                                }),
                                 if (_isFetchingMore)
                                   const DataRow(cells: [
                                     DataCell(CircularProgressIndicator()),

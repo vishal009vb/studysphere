@@ -73,7 +73,7 @@ class _GradientButtonState extends State<GradientButton> with SingleTickerProvid
               boxShadow: isEnabled
                   ? [
                       BoxShadow(
-                        color: widget.gradient.colors.first.withOpacity(0.35),
+                        color: widget.gradient.colors.first.withValues(alpha: 0.35),
                         blurRadius: 16,
                         offset: const Offset(0, 8),
                       ),

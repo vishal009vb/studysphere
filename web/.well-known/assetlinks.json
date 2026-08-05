@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.studysphere",
+      "sha256_cert_fingerprints": [
+        "74:02:8F:15:F7:EB:34:AA:6A:BF:8D:7C:A6:02:EA:45:CE:1B:0E:4E:AF:0D:22:3A:4F:D8:AF:4A:C0:86:5B:A5"
+      ]
+    }
+  }
+]

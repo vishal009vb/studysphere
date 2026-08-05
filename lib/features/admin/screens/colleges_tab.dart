@@ -105,7 +105,7 @@ class _CollegesTabState extends ConsumerState<CollegesTab> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: college.isActive ? AppColors.success.withOpacity(0.1) : AppColors.error.withOpacity(0.1),
+                              color: college.isActive ? AppColors.success.withValues(alpha: 0.1) : AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
@@ -122,7 +122,7 @@ class _CollegesTabState extends ConsumerState<CollegesTab> {
                           Switch(
                             value: college.isActive,
                             onChanged: (val) => _toggleCollege(college, val),
-                            activeColor: AppColors.success,
+                            activeThumbColor: AppColors.success,
                           ),
                         ),
                       ],

@@ -117,7 +117,7 @@ class AppColors {
   /// Primary-tinted hover shadow
   static List<BoxShadow> get shadowHover => [
     BoxShadow(
-      color: primary.withOpacity(0.15),
+      color: primary.withValues(alpha: 0.15),
       offset: const Offset(0, 8),
       blurRadius: 20,
     ),

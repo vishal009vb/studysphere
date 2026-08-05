@@ -24,7 +24,7 @@ class AiDisclaimerScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            LegalHeroHeader(
+            const LegalHeroHeader(
               icon: Icons.smart_toy_rounded,
               title: 'AI Disclaimer',
               subtitle: 'Important information about the StudySphere AI Assistant.',
@@ -105,7 +105,7 @@ class AiDisclaimerScreen extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
+                      color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(icon, color: color, size: 20),
@@ -154,7 +154,7 @@ class ContentDisclaimerScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            LegalHeroHeader(
+            const LegalHeroHeader(
               icon: Icons.folder_special_rounded,
               title: 'Content Disclaimer',
               subtitle: 'Important information about community content on StudySphere.',
@@ -233,7 +233,7 @@ class ContentDisclaimerScreen extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.teal.withOpacity(0.1),
+                  color: Colors.teal.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: Colors.teal, size: 20),

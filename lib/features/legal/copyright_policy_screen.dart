@@ -19,7 +19,7 @@ class CopyrightPolicyScreen extends StatelessWidget {
         ),
         title: Text('Copyright Policy', style: AppTextStyles.headingSmall),
       ),
-      body: SingleChildScrollView(
+      body: const SingleChildScrollView(
         child: Column(
           children: [
             LegalHeroHeader(
@@ -30,7 +30,7 @@ class CopyrightPolicyScreen extends StatelessWidget {
               color: Colors.deepOrange,
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -74,7 +74,7 @@ class CopyrightPolicyScreen extends StatelessWidget {
                     content:
                         'For all copyright-related matters:\n\nEmail: vishalbhoi475@gmail.com\nApp: Profile → Contact Support → Copyright Issue',
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 20),
                 ],
               ),
             ),

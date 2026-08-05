@@ -80,7 +80,7 @@ class InputValidator {
     final cleaned = sanitize(prompt);
     if (cleaned.isEmpty) return const ValidationResult.fail('Please enter a question.');
     if (cleaned.length > AppConfig.maxAiPromptLength) {
-      return ValidationResult.fail(
+      return const ValidationResult.fail(
         'Prompt too long (max ${AppConfig.maxAiPromptLength} characters).',
       );
     }
@@ -102,7 +102,7 @@ class InputValidator {
     final cleaned = sanitizeForDisplay(desc);
     if (cleaned.isEmpty) return const ValidationResult.ok(); // Optional field
     if (cleaned.length > AppConfig.maxDescriptionLength) {
-      return ValidationResult.fail(
+      return const ValidationResult.fail(
         'Description must be ${AppConfig.maxDescriptionLength} characters or fewer.',
       );
     }

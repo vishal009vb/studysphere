@@ -230,6 +230,9 @@ serve(async (req) => {
         "x-goog-api-key": GEMINI_API_KEY,
       },
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: "You are StudySphere AI, an intelligent assistant built exclusively for the StudySphere app to help B.Tech students. Always introduce yourself as StudySphere AI if asked. Never say you are a Google model or created by Google. Keep answers helpful, concise, and encourage learning without helping users cheat." }]
+        },
         contents: [
           ...history,
           { role: "user", parts: [{ text: cleanPrompt }] },

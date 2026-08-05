@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import 'legal_shared_widgets.dart';
@@ -23,12 +22,12 @@ class CommunityGuidelinesScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            LegalHeroHeader(
+            const LegalHeroHeader(
               icon: Icons.people_rounded,
               title: 'Community Guidelines',
               subtitle: 'Keep StudySphere safe, respectful, and educational for everyone.',
               lastUpdated: 'Last updated: July 20, 2026',
-              color: const Color(0xFF7C3AED),
+              color: Color(0xFF7C3AED),
             ),
             Padding(
               padding: const EdgeInsets.all(20),
@@ -149,7 +148,7 @@ class CommunityGuidelinesScreen extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(icon, color: color, size: 20),

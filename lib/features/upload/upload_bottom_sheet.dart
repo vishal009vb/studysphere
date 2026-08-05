@@ -10,7 +10,6 @@ import '../../services/firestore_service.dart';
 import '../../services/storage_service.dart';
 import '../../models/note_model.dart';
 import '../../models/question_paper_model.dart';
-import '../../models/user_model.dart';
 import '../../core/utils/pdf_classifier.dart';
 import '../../core/utils/input_validator.dart';
 import '../../core/config/app_config.dart';
@@ -58,7 +57,6 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
   bool _isUploading = false;
   String _uploadStatusText = '';
   File? _selectedFile;
-  UserModel? _currentUserProfile;
 
   @override
   void initState() {
@@ -67,19 +65,10 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
   }
 
   Future<void> _loadUserProfile() async {
-    try {
-      final user = ref.read(authServiceProvider).currentUser;
-      if (user != null) {
-        final profile = await ref.read(firestoreServiceProvider).getUserProfile(user.uid);
-        setState(() {
-          _currentUserProfile = profile;
-          final sems = _semesters;
-          _selectedSemester = sems.isNotEmpty ? sems.first : '';
-        });
-      }
-    } catch (e) {
-      // ignore
-    }
+    final sems = _semesters;
+    setState(() {
+      _selectedSemester = sems.isNotEmpty ? sems.first : '';
+    });
   }
 
   @override
@@ -401,7 +390,7 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
-                      value: _selectedCourse,
+                      initialValue: _selectedCourse,
                       items: _courses
                           .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                           .toList(),
@@ -423,7 +412,7 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _selectedSemester.isEmpty ? _semesters.first : _selectedSemester,
+                        initialValue: _selectedSemester.isEmpty ? _semesters.first : _selectedSemester,
                         items: _semesters
                             .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                             .toList(),

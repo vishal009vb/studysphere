@@ -77,10 +77,10 @@ class _StudySphereCardState extends State<StudySphereCard> with SingleTickerProv
           filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
           child: Container(
             decoration: BoxDecoration(
-              color: (widget.color ?? Colors.white).withOpacity(0.85),
+              color: (widget.color ?? Colors.white).withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(widget.borderRadius),
               border: Border.all(
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 width: 1.5,
               ),
               boxShadow: AppColors.glassShadow,

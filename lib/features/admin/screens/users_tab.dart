@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_text_styles.dart';
 import '../../../services/firestore_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/admin_log_service.dart';
@@ -135,9 +136,13 @@ class _UsersTabState extends ConsumerState<UsersTab> {
 
       if (currentUser != null) {
         String action = 'Updated User Status';
-        if (isBanned != null) action = isBanned ? 'User Ban' : 'User Unban';
-        else if (isSuspended != null) action = isSuspended ? 'User Warn' : 'User Remove Warning';
-        else if (role != null) action = 'Changed User Role to \$role';
+        if (isBanned != null) {
+          action = isBanned ? 'User Ban' : 'User Unban';
+        } else if (isSuspended != null) {
+          action = isSuspended ? 'User Warn' : 'User Remove Warning';
+        } else if (role != null) {
+          action = 'Changed User Role to $role';
+        }
 
         await ref.read(adminLogServiceProvider).logAction(
           adminId: currentUser.uid,
@@ -158,7 +163,7 @@ class _UsersTabState extends ConsumerState<UsersTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: \$e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Error: \$e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -169,7 +174,7 @@ class _UsersTabState extends ConsumerState<UsersTab> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Manage \${user.name}'),
+          title: const Text('Manage \${user.name}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -240,7 +245,7 @@ class _UsersTabState extends ConsumerState<UsersTab> {
               const SizedBox(width: 8),
               DropdownButton<String>(
                 value: _searchField,
-                items: ['name', 'email'].map((e) => DropdownMenuItem(value: e, child: Text('By \$e'))).toList(),
+                items: ['name', 'email'].map((e) => DropdownMenuItem(value: e, child: const Text('By \$e'))).toList(),
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _searchField = val);
@@ -297,20 +302,56 @@ class _UsersTabState extends ConsumerState<UsersTab> {
                         final user = _users[index];
                         return Card(
                           margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 1.5,
                           child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             leading: CircleAvatar(
+                              radius: 24,
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                               backgroundImage: user.photoUrl.isNotEmpty ? NetworkImage(user.photoUrl) : null,
-                              child: user.photoUrl.isEmpty ? const Icon(Icons.person) : null,
+                              child: user.photoUrl.isEmpty ? const Icon(Icons.person, color: AppColors.primary) : null,
                             ),
-                            title: Text(user.name.isEmpty ? 'Unknown User' : user.name),
-                            subtitle: Text('\${user.email} • \${user.role.toUpperCase()}'),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    user.name.isEmpty ? 'Student' : user.name,
+                                    style: AppTextStyles.headingSmall.copyWith(fontSize: 15),
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                                  ),
+                                  child: Text(
+                                    '\$${(user.reputationPoints * 0.05).toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF059669),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4.0),
+                              child: Text(
+                                '${user.email} • ${user.role.toUpperCase()} • ${user.reputationPoints} pts',
+                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                              ),
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (user.isBanned) const Icon(Icons.block, color: AppColors.error),
-                                if (user.isSuspended) const Icon(Icons.warning, color: Colors.orange),
+                                if (user.isBanned) const Icon(Icons.block, color: AppColors.error, size: 20),
+                                if (user.isSuspended) const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
                                 IconButton(
-                                  icon: const Icon(Icons.edit),
+                                  icon: const Icon(Icons.edit_note_rounded, color: AppColors.primary),
                                   onPressed: () => _showEditUserDialog(user),
                                 ),
                               ],

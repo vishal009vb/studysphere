@@ -67,7 +67,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.12),
+                  color: AppColors.success.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check_circle_rounded, size: 44, color: AppColors.success),
@@ -120,7 +120,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            LegalHeroHeader(
+            const LegalHeroHeader(
               icon: Icons.delete_forever_rounded,
               title: 'Delete Account',
               subtitle: 'We are sorry to see you go.',
@@ -136,9 +136,9 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.08),
+                      color: AppColors.error.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
@@ -240,7 +240,7 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.error,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: AppColors.error.withOpacity(0.4),
+                        disabledBackgroundColor: AppColors.error.withValues(alpha: 0.4),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
                       ),
@@ -294,8 +294,8 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
             height: 36,
             decoration: BoxDecoration(
               color: willDelete
-                  ? AppColors.error.withOpacity(0.1)
-                  : AppColors.warning.withOpacity(0.1),
+                  ? AppColors.error.withValues(alpha: 0.1)
+                  : AppColors.warning.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(

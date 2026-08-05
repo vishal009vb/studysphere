@@ -36,15 +36,25 @@ class PdfClassifier {
     final lowerName = filename.toLowerCase();
 
     // 1. Detect Course
-    if (lowerName.contains('bca')) course = 'BCA';
-    else if (lowerName.contains('bcs') || lowerName.contains('bsc')) course = 'BSc'; 
-    else if (lowerName.contains('mca')) course = 'MCA';
-    else if (lowerName.contains('mcs')) course = 'MCS';
-    else if (lowerName.contains('bba')) course = 'BBA';
-    else if (lowerName.contains('bcom') || lowerName.contains('b.com')) course = 'BCom';
-    else if (lowerName.contains('upsc')) course = 'UPSC';
-    else if (lowerName.contains('mpsc')) course = 'MPSC';
-    else if (lowerName.contains('eng') || lowerName.contains('engineering')) course = 'Engineering';
+    if (lowerName.contains('bca')) {
+      course = 'BCA';
+    } else if (lowerName.contains('bcs') || lowerName.contains('bsc')) {
+      course = 'BSc';
+    } else if (lowerName.contains('mca')) {
+      course = 'MCA';
+    } else if (lowerName.contains('mcs')) {
+      course = 'MCS';
+    } else if (lowerName.contains('bba')) {
+      course = 'BBA';
+    } else if (lowerName.contains('bcom') || lowerName.contains('b.com')) {
+      course = 'BCom';
+    } else if (lowerName.contains('upsc')) {
+      course = 'UPSC';
+    } else if (lowerName.contains('mpsc')) {
+      course = 'MPSC';
+    } else if (lowerName.contains('eng') || lowerName.contains('engineering')) {
+      course = 'Engineering';
+    }
 
     // 2. Detect Semester
     final semRegex = RegExp(r'sem(ester)?\s*[_.-]?\s*(\d)', caseSensitive: false);
@@ -109,12 +119,12 @@ class PdfClassifier {
       subject = unusedTokens.join(' ');
       
       // Clean up subject format
-      subject = subject!.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
+      subject = subject.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '').trim();
     }
 
     // 6. Generate Title
     if (type == 'Notes') {
-      if (subject != null && subject!.isNotEmpty) {
+      if (subject != null && subject.isNotEmpty) {
         title = '$subject Notes';
       } else {
         title = 'Study Notes';

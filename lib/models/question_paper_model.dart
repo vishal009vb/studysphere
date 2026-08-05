@@ -86,22 +86,22 @@ class QuestionPaperModel {
     String? status,
   }) {
     return QuestionPaperModel(
-      paperId: this.paperId,
+      paperId: paperId,
       title: title ?? this.title,
       course: course ?? this.course,
       semester: semester ?? this.semester,
       subject: subject ?? this.subject,
       year: year ?? this.year,
       pdfUrl: pdfUrl ?? this.pdfUrl,
-      fileHash: this.fileHash,
-      uploadedBy: this.uploadedBy,
-      downloads: this.downloads,
-      likes: this.likes,
-      reports: this.reports,
+      fileHash: fileHash,
+      uploadedBy: uploadedBy,
+      downloads: downloads,
+      likes: likes,
+      reports: reports,
       status: status ?? this.status,
-      collegeId: this.collegeId,
-      state: this.state,
-      district: this.district,
+      collegeId: collegeId,
+      state: state,
+      district: district,
     );
   }
 }

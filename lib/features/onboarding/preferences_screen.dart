@@ -6,7 +6,6 @@ import '../../core/constants/app_text_styles.dart';
 import '../../services/firestore_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/location_service.dart';
-import '../../models/college_model.dart';
 import '../auth/widgets/college_search_dialog.dart';
 import '../../services/college_service.dart';
 
@@ -142,7 +141,7 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-      value: value,
+      initialValue: value,
       items: items.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
       onChanged: onChanged,
       isExpanded: true,
@@ -233,9 +232,9 @@ class _PreferencesScreenState extends ConsumerState<PreferencesScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.1),
+                      color: AppColors.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                      border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
