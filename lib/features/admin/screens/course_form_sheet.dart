@@ -404,7 +404,7 @@ class _CourseFormSheetState extends ConsumerState<CourseFormSheet> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -5))
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, -5))
                 ],
               ),
               child: SizedBox(
@@ -454,7 +454,7 @@ class _CourseFormSheetState extends ConsumerState<CourseFormSheet> {
 
   Widget _buildDropdown(String label, List<String> items, String value, void Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       decoration: InputDecoration(
         labelText: label,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),

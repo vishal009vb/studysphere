@@ -180,11 +180,11 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
       String? filterState;
       
       if (_userProfile != null) {
-        if (_selectedTier == 'My College' && _userProfile!.collegeId != null && _userProfile!.collegeId!.isNotEmpty) {
+        if (_selectedTier == 'My College' && _userProfile!.collegeId.isNotEmpty) {
           filterCollegeId = _userProfile!.collegeId;
-        } else if (_selectedTier == 'My District' && _userProfile!.district != null && _userProfile!.district!.isNotEmpty) {
+        } else if (_selectedTier == 'My District' && _userProfile!.district.isNotEmpty) {
           filterDistrict = _userProfile!.district;
-        } else if (_selectedTier == 'My State' && _userProfile!.state != null && _userProfile!.state!.isNotEmpty) {
+        } else if (_selectedTier == 'My State' && _userProfile!.state.isNotEmpty) {
           filterState = _userProfile!.state;
         }
       }
@@ -212,10 +212,11 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
         _goBack();
-        return false;
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -267,7 +268,7 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
               _buildStepIndicator(),
 
               // ── Tier Filter Chips ──
-              if (_currentStep == 'papers' && _userProfile != null && _userProfile!.collegeId != null && _userProfile!.collegeId!.isNotEmpty)
+              if (_currentStep == 'papers' && _userProfile != null && _userProfile!.collegeId.isNotEmpty)
                 SizedBox(
                   height: 44,
                   child: ListView(
@@ -284,7 +285,7 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
                             setState(() => _selectedTier = tier);
                             _loadPapers();
                           },
-                          selectedColor: AppColors.success.withOpacity(0.15),
+                          selectedColor: AppColors.success.withValues(alpha: 0.15),
                           checkmarkColor: AppColors.success,
                           labelStyle: TextStyle(
                             color: isSelected ? AppColors.success : AppColors.textSecondary,
@@ -352,7 +353,7 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: isLast
-                          ? AppColors.success.withOpacity(0.15)
+                          ? AppColors.success.withValues(alpha: 0.15)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -518,9 +519,9 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
             onTap: () => onSelect(item['name'] as String),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9), // Translucent glass
+                color: Colors.white.withValues(alpha: 0.9), // Translucent glass
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border.withOpacity(0.5), width: 1),
+                border: Border.all(color: AppColors.border.withValues(alpha: 0.5), width: 1),
                 boxShadow: AppColors.softShadow,
               ),
               child: Column(
@@ -530,7 +531,7 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
                     width: 52,
                     height: 52,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
+                      color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: Icon(
@@ -580,7 +581,7 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(Icons.quiz_outlined,
-                size: 72, color: AppColors.textSecondary.withOpacity(0.5)),
+                size: 72, color: AppColors.textSecondary.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text('No question papers uploaded yet',
                 style: AppTextStyles.headingSmall),
@@ -619,9 +620,9 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
               margin: const EdgeInsets.only(bottom: 14),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border.withOpacity(0.5), width: 1),
+                border: Border.all(color: AppColors.border.withValues(alpha: 0.5), width: 1),
                 boxShadow: AppColors.softShadow,
               ),
               child: Row(
@@ -683,7 +684,7 @@ class _QuestionPapersScreenState extends ConsumerState<QuestionPapersScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(

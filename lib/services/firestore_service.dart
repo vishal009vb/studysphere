@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
@@ -7,7 +8,9 @@ import '../models/post_model.dart';
 import '../models/comment_model.dart';
 import '../models/report_model.dart';
 import '../models/notification_model.dart';
+import '../models/global_notification_model.dart';
 import '../models/college_model.dart';
+import '../models/banner_model.dart';
 import '../features/courses/models/course_model.dart';
 
 final firestoreServiceProvider = Provider<FirestoreService>((ref) {
@@ -33,7 +36,7 @@ class FirestoreService {
       // Basic prefix search
       query = query
           .where(searchField, isGreaterThanOrEqualTo: searchQuery)
-          .where(searchField, isLessThanOrEqualTo: searchQuery + '\uf8ff')
+          .where(searchField, isLessThanOrEqualTo: '$searchQuery\uf8ff')
           .orderBy(searchField);
     } else {
       query = query.orderBy('createdAt', descending: true);
@@ -117,6 +120,20 @@ class FirestoreService {
     });
   }
 
+  Future<void> updateUserField(String uid, String field, dynamic value) async {
+    await _db.collection('users').doc(uid).update({field: value});
+  }
+
+  /// Returns true if the username is NOT taken (available)
+  Future<bool> isUsernameAvailable(String username) async {
+    final snap = await _db
+        .collection('users')
+        .where('username', isEqualTo: username.toLowerCase().trim())
+        .limit(1)
+        .get();
+    return snap.docs.isEmpty;
+  }
+
   Future<void> updateOnboardingData(String uid, String role, String coursePreference, String state, String district, String subDistrict, String collegeId, String collegeName) async {
     // We use set with merge so that if the profile doesn't exist (due to past failure), it gets created.
     await _db.collection('users').doc(uid).set({
@@ -149,7 +166,7 @@ class FirestoreService {
         .limit(limit)
         .get();
 
-    return snapshot.docs.map((doc) => CollegeModel.fromMap(doc.data() as Map<String, dynamic>, doc.id)).toList();
+    return snapshot.docs.map((doc) => CollegeModel.fromMap(doc.data(), doc.id)).toList();
   }
 
   Future<List<CollegeModel>> getCollegesPaginated({DocumentSnapshot? startAfter, int limit = 20}) async {
@@ -267,7 +284,7 @@ class FirestoreService {
       final lowercaseQuery = searchQuery.toLowerCase();
       query = query
           .where(searchField, isGreaterThanOrEqualTo: lowercaseQuery)
-          .where(searchField, isLessThanOrEqualTo: lowercaseQuery + '\uf8ff')
+          .where(searchField, isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
           .orderBy(searchField);
     } else {
       query = query.orderBy('createdAt', descending: true);
@@ -397,7 +414,7 @@ class FirestoreService {
       final lowercaseQuery = searchQuery.toLowerCase();
       query = query
           .where(searchField, isGreaterThanOrEqualTo: lowercaseQuery)
-          .where(searchField, isLessThanOrEqualTo: lowercaseQuery + '\uf8ff')
+          .where(searchField, isLessThanOrEqualTo: '$lowercaseQuery\uf8ff')
           .orderBy(searchField);
     } else {
       query = query.orderBy('createdAt', descending: true);
@@ -526,6 +543,34 @@ class FirestoreService {
       
       transaction.update(contentRef, {'likes': FieldValue.increment(1)});
     });
+
+    try {
+      final String collection = contentType == 'post'
+          ? 'posts'
+          : (contentType == 'note' ? 'notes' : 'questionPapers');
+      final contentDoc = await _db.collection(collection).doc(contentId).get();
+      final authorId = contentDoc.data()?['authorId'] ?? contentDoc.data()?['uploadedBy'];
+      
+      if (authorId != null && authorId != userId) {
+        final likerDoc = await _db.collection('users').doc(userId).get();
+        final likerName = likerDoc.data()?['name'] ?? 'Someone';
+        final title = contentDoc.data()?['title'] ?? 'your content';
+
+        await sendNotification(NotificationModel(
+          notificationId: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+          receiverId: authorId,
+          senderId: userId,
+          senderName: likerName,
+          type: 'like',
+          contentId: contentId,
+          title: 'New Like ❤️',
+          body: '$likerName liked "$title"',
+          route: contentType == 'note' ? '/notes/$contentId' : '/community',
+          priority: 'low',
+          createdAt: DateTime.now(),
+        ));
+      }
+    } catch (_) {}
   }
 
   Future<void> unlikeContent(String userId, String contentId, String contentType) async {
@@ -562,7 +607,40 @@ class FirestoreService {
         await noteDoc.update({'commentsCount': FieldValue.increment(1)});
       }
     }
+
+    try {
+      String? authorId;
+      String title = 'your post';
+
+      if (postSnap.exists) {
+        authorId = postSnap.data()?['authorId'];
+      } else {
+        final noteDoc = _db.collection('notes').doc(comment.contentId);
+        final noteSnap = await noteDoc.get();
+        if (noteSnap.exists) {
+          authorId = noteSnap.data()?['uploadedBy'];
+          title = noteSnap.data()?['title'] ?? 'your note';
+        }
+      }
+
+      if (authorId != null && authorId != comment.authorId) {
+        await sendNotification(NotificationModel(
+          notificationId: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+          receiverId: authorId,
+          senderId: comment.authorId,
+          senderName: comment.authorName,
+          type: 'comment',
+          contentId: comment.contentId,
+          title: 'New Comment 💬',
+          body: '${comment.authorName} commented on $title: "${comment.text}"',
+          route: '/community',
+          priority: 'normal',
+          createdAt: DateTime.now(),
+        ));
+      }
+    } catch (_) {}
   }
+
 
   Future<void> followUser(String followerId, String followingId) async {
     final followId = '${followerId}_$followingId';
@@ -575,8 +653,8 @@ class FirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      transaction.update(_db.collection('users').doc(followerId), {'followingCount': FieldValue.increment(1)});
-      transaction.update(_db.collection('users').doc(followingId), {'followersCount': FieldValue.increment(1)});
+      transaction.set(_db.collection('users').doc(followerId), {'followingCount': FieldValue.increment(1)}, SetOptions(merge: true));
+      transaction.set(_db.collection('users').doc(followingId), {'followersCount': FieldValue.increment(1)}, SetOptions(merge: true));
     });
   }
 
@@ -587,8 +665,77 @@ class FirestoreService {
     await _db.runTransaction((transaction) async {
       transaction.delete(followRef);
 
-      transaction.update(_db.collection('users').doc(followerId), {'followingCount': FieldValue.increment(-1)});
-      transaction.update(_db.collection('users').doc(followingId), {'followersCount': FieldValue.increment(-1)});
+      transaction.set(_db.collection('users').doc(followerId), {'followingCount': FieldValue.increment(-1)}, SetOptions(merge: true));
+      transaction.set(_db.collection('users').doc(followingId), {'followersCount': FieldValue.increment(-1)}, SetOptions(merge: true));
+    });
+  }
+
+  Future<List<UserModel>> getFollowers(String userId) async {
+    final snapshot = await _db.collection('followers').where('followingId', isEqualTo: userId).get();
+    List<UserModel> users = [];
+    for (var doc in snapshot.docs) {
+      final followerId = doc.data()['followerId'] as String?;
+      if (followerId != null) {
+        try {
+          final user = await getUserProfile(followerId);
+          users.add(user);
+        } catch (_) {}
+      }
+    }
+    return users;
+  }
+
+  Future<List<UserModel>> getFollowing(String userId) async {
+    final snapshot = await _db.collection('followers').where('followerId', isEqualTo: userId).get();
+    List<UserModel> users = [];
+    for (var doc in snapshot.docs) {
+      final followingId = doc.data()['followingId'] as String?;
+      if (followingId != null) {
+        try {
+          final user = await getUserProfile(followingId);
+          users.add(user);
+        } catch (_) {}
+      }
+    }
+    return users;
+  }
+
+  Future<bool> isFollowingUser(String followerId, String followingId) async {
+    final doc = await _db.collection('followers').doc('${followerId}_$followingId').get();
+    return doc.exists;
+  }
+
+  Future<List<UserModel>> getSuggestedUsers(String currentUid) async {
+    final snapshot = await _db.collection('users').limit(40).get();
+    List<UserModel> suggestions = [];
+    
+    final followingSnapshot = await _db.collection('followers').where('followerId', isEqualTo: currentUid).get();
+    final followingIds = followingSnapshot.docs.map((doc) => doc.data()['followingId'] as String?).toSet();
+
+    final seenUsernames = <String>{};
+    for (var doc in snapshot.docs) {
+      final user = UserModel.fromMap(doc.data());
+      if (user.uid != currentUid && !followingIds.contains(user.uid)) {
+        final usernameKey = user.username.trim().toLowerCase();
+        if (usernameKey.isEmpty) {
+          suggestions.add(user);
+        } else if (!seenUsernames.contains(usernameKey)) {
+          seenUsernames.add(usernameKey);
+          suggestions.add(user);
+        }
+      }
+    }
+    return suggestions.take(15).toList();
+  }
+
+  Future<void> removeFollower(String currentUid, String followerId) async {
+    final followId = '${followerId}_$currentUid';
+    final followRef = _db.collection('followers').doc(followId);
+
+    await _db.runTransaction((transaction) async {
+      transaction.delete(followRef);
+      transaction.set(_db.collection('users').doc(currentUid), {'followersCount': FieldValue.increment(-1)}, SetOptions(merge: true));
+      transaction.set(_db.collection('users').doc(followerId), {'followingCount': FieldValue.increment(-1)}, SetOptions(merge: true));
     });
   }
 
@@ -716,15 +863,42 @@ class FirestoreService {
   Future<void> moderateNote(String noteId, String status) async {
     await _db.collection('notes').doc(noteId).update({'status': status});
     
-    // If approved, trigger reputation points for uploader
-    if (status == 'approved') {
-      final doc = await _db.collection('notes').doc(noteId).get();
-      final uploaderId = doc.data()?['uploadedBy'];
-      if (uploaderId != null) {
-        await addReputationPoints(uploaderId, 10); // +10 points for approved upload
+    final doc = await _db.collection('notes').doc(noteId).get();
+    final uploaderId = doc.data()?['uploadedBy'];
+    final title = doc.data()?['title'] ?? 'Note';
+
+    if (uploaderId != null) {
+      if (status == 'approved') {
+        await addReputationPoints(uploaderId, 10);
         await _db.collection('users').doc(uploaderId).update({
           'uploadsCount': FieldValue.increment(1)
         });
+        await sendNotification(NotificationModel(
+          notificationId: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+          receiverId: uploaderId,
+          senderId: 'system',
+          senderName: 'StudySphere Admin',
+          type: 'upload_approved',
+          contentId: noteId,
+          title: 'Note Approved 🎉',
+          body: 'Your note "$title" was approved! You earned +10 points.',
+          route: '/notes/$noteId',
+          priority: 'high',
+          createdAt: DateTime.now(),
+        ));
+      } else if (status == 'rejected') {
+        await sendNotification(NotificationModel(
+          notificationId: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+          receiverId: uploaderId,
+          senderId: 'system',
+          senderName: 'StudySphere Admin',
+          type: 'upload_rejected',
+          contentId: noteId,
+          title: 'Note Review Update',
+          body: 'Your note "$title" did not meet quality guidelines and was rejected.',
+          priority: 'normal',
+          createdAt: DateTime.now(),
+        ));
       }
     }
   }
@@ -732,8 +906,6 @@ class FirestoreService {
   Future<void> updateNoteStatus(String noteId, String status) async {
     await _db.collection('notes').doc(noteId).update({'status': status});
   }
-
-
 
   Future<List<NoteModel>> fetchUserNotes(String userId) async {
     final snapshot = await _db
@@ -761,15 +933,42 @@ class FirestoreService {
   Future<void> moderateQuestionPaper(String paperId, String status) async {
     await _db.collection('questionPapers').doc(paperId).update({'status': status});
     
-    // If approved, trigger reputation points for uploader
-    if (status == 'approved') {
-      final doc = await _db.collection('questionPapers').doc(paperId).get();
-      final uploaderId = doc.data()?['uploadedBy'];
-      if (uploaderId != null) {
-        await addReputationPoints(uploaderId, 15); // +15 points for PYQ upload
+    final doc = await _db.collection('questionPapers').doc(paperId).get();
+    final uploaderId = doc.data()?['uploadedBy'];
+    final title = doc.data()?['title'] ?? 'Question Paper';
+
+    if (uploaderId != null) {
+      if (status == 'approved') {
+        await addReputationPoints(uploaderId, 15);
         await _db.collection('users').doc(uploaderId).update({
           'uploadsCount': FieldValue.increment(1)
         });
+        await sendNotification(NotificationModel(
+          notificationId: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+          receiverId: uploaderId,
+          senderId: 'system',
+          senderName: 'StudySphere Admin',
+          type: 'upload_approved',
+          contentId: paperId,
+          title: 'PYQ Approved 🎉',
+          body: 'Your question paper "$title" was approved! You earned +15 points.',
+          route: '/papers',
+          priority: 'high',
+          createdAt: DateTime.now(),
+        ));
+      } else if (status == 'rejected') {
+        await sendNotification(NotificationModel(
+          notificationId: 'notif_${DateTime.now().millisecondsSinceEpoch}',
+          receiverId: uploaderId,
+          senderId: 'system',
+          senderName: 'StudySphere Admin',
+          type: 'upload_rejected',
+          contentId: paperId,
+          title: 'PYQ Review Update',
+          body: 'Your question paper "$title" was rejected by moderators.',
+          priority: 'normal',
+          createdAt: DateTime.now(),
+        ));
       }
     }
   }
@@ -808,17 +1007,88 @@ class FirestoreService {
     await _db.collection('notifications').doc(notification.notificationId).set(notification.toMap());
   }
 
-  Future<List<NotificationModel>> fetchNotifications(String userId) async {
-    final snapshot = await _db
+  /// Streams personal notifications for [userId] (only items within the last 30 days)
+  Stream<List<NotificationModel>> streamUserNotifications(String userId, {int limit = 50}) {
+    if (userId.isEmpty) return Stream.value([]);
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    return _db
         .collection('notifications')
         .where('receiverId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) {
+          final list = snap.docs
+              .map((doc) => NotificationModel.fromMap(doc.data(), doc.id))
+              .where((item) => item.createdAt.isAfter(thirtyDaysAgo))
+              .toList();
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          return list;
+        })
+        .handleError((e) {
+          debugPrint("Error streaming user notifications: $e");
+          return <NotificationModel>[];
+        });
+  }
+
+  Future<List<NotificationModel>> fetchNotifications(String userId) async {
+    if (userId.isEmpty) return [];
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    try {
+      final snapshot = await _db
+          .collection('notifications')
+          .where('receiverId', isEqualTo: userId)
+          .get();
+
+      final list = snapshot.docs
+          .map((doc) => NotificationModel.fromMap(doc.data(), doc.id))
+          .where((item) => item.createdAt.isAfter(thirtyDaysAgo))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    } catch (e) {
+      debugPrint("Error fetching notifications: $e");
+      return [];
+    }
+  }
+
+  Future<void> markNotificationAsRead(String notificationId) async {
+    await _db.collection('notifications').doc(notificationId).update({'read': true});
+  }
+
+  Future<void> markAllNotificationsAsRead(String userId) async {
+    final snap = await _db
+        .collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .where('read', isEqualTo: false)
         .get();
 
-    return snapshot.docs
-        .map((doc) => NotificationModel.fromMap(doc.data(), doc.id))
-        .toList();
+    final batch = _db.batch();
+    for (var doc in snap.docs) {
+      batch.update(doc.reference, {'read': true});
+    }
+    await batch.commit();
   }
+
+  Future<void> deleteNotification(String notificationId) async {
+    await _db.collection('notifications').doc(notificationId).delete();
+  }
+
+  /// Automatically cleans up user notifications older than 30 days to optimize Firestore cost
+  Future<void> deleteOldUserNotifications(String userId) async {
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    final oldDocs = await _db
+        .collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .where('createdAt', isLessThan: thirtyDaysAgo)
+        .get();
+
+    final batch = _db.batch();
+    for (var doc in oldDocs.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
 
   // --- AI ASSISTANT OPERATIONS ---
 
@@ -915,16 +1185,85 @@ class FirestoreService {
   }
 
   // ── Admin: Global Announcements ──
-  Future<void> sendGlobalAnnouncement(String title, String body) async {
+  Future<void> sendGlobalAnnouncement({
+    required String title,
+    required String body,
+    String priority = 'normal',
+    String type = 'announcement',
+    String targetCourse = 'All',
+    String targetSemester = 'All',
+    String? route,
+    String? imageUrl,
+    String? actionLabel,
+    int expiryDays = 30,
+  }) async {
+    final now = DateTime.now();
+    final expiresAt = now.add(Duration(days: expiryDays));
+
     final notification = {
       'title': title,
       'body': body,
+      'type': type,
+      'priority': priority,
+      'targetCourse': targetCourse,
+      'targetSemester': targetSemester,
+      'route': route,
+      'imageUrl': imageUrl,
+      'actionLabel': actionLabel,
       'createdAt': FieldValue.serverTimestamp(),
-      'type': 'global_announcement',
+      'expiresAt': Timestamp.fromDate(expiresAt),
+      'isActive': true,
     };
     await _db.collection('global_notifications').add(notification);
-    // Cloud Function or backend should listen to this collection to trigger FCM to all users
   }
+
+  Stream<List<GlobalNotificationModel>> streamGlobalAnnouncements({
+    String? userCourse,
+    String? userSemester,
+  }) {
+    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+    return _db
+        .collection('global_notifications')
+        .snapshots()
+        .map((snap) {
+      final list = snap.docs
+          .map((doc) => GlobalNotificationModel.fromMap(doc.data(), doc.id))
+          .where((item) => item.isActive)
+          .where((item) => item.createdAt.isAfter(thirtyDaysAgo))
+          .where((item) {
+            if (item.targetCourse != 'All' && userCourse != null && userCourse.isNotEmpty) {
+              if (item.targetCourse.toLowerCase() != userCourse.toLowerCase()) return false;
+            }
+            if (item.targetSemester != 'All' && userSemester != null && userSemester.isNotEmpty) {
+              if (item.targetSemester.toLowerCase() != userSemester.toLowerCase()) return false;
+            }
+            return true;
+          })
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    }).handleError((e) {
+      debugPrint("Error streaming global announcements: $e");
+      return <GlobalNotificationModel>[];
+    });
+  }
+
+  Future<void> deleteGlobalAnnouncement(String announcementId) async {
+    await _db.collection('global_notifications').doc(announcementId).delete();
+  }
+
+  Future<List<UserModel>> fetchAllUsers({int limit = 100}) async {
+    try {
+      final snapshot = await _db.collection('users').limit(limit).get();
+      return snapshot.docs
+          .map((doc) => UserModel.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      debugPrint("Error fetching users: $e");
+      return [];
+    }
+  }
+
 
   // ── Admin: Banners ──
   Future<void> addBanner(String imageUrl, int order, String redirectType, Map<String, dynamic> redirectData) async {
@@ -936,6 +1275,17 @@ class FirestoreService {
       'redirectData': redirectData,
       'createdAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<List<BannerModel>> fetchActiveBanners() async {
+    final snap = await _db
+        .collection('banners')
+        .where('isActive', isEqualTo: true)
+        .orderBy('order')
+        .get();
+    return snap.docs
+        .map((d) => BannerModel.fromMap(d.data(), d.id))
+        .toList();
   }
 
   Future<void> deleteBanner(String bannerId) async {
@@ -961,7 +1311,7 @@ class FirestoreService {
   // ── Admin: Colleges ──
   Future<List<CollegeModel>> getAllColleges() async {
     final snap = await _db.collection('colleges').get();
-    return snap.docs.map((d) => CollegeModel.fromMap(d.data() as Map<String, dynamic>, d.id)).toList();
+    return snap.docs.map((d) => CollegeModel.fromMap(d.data(), d.id)).toList();
   }
 
   Future<void> toggleCollegeStatus(String collegeId, bool isActive) async {

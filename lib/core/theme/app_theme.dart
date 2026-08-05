@@ -23,11 +23,11 @@ class AppTheme {
         bodySmall: AppTextStyles.bodySmall,
       ),
       cardTheme: CardThemeData(
-        color: AppColors.surface.withOpacity(0.9), // Slightly translucent base
+        color: AppColors.surface.withValues(alpha: 0.9), // Slightly translucent base
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: AppColors.border.withOpacity(0.5), width: 1),
+          side: BorderSide(color: AppColors.border.withValues(alpha: 0.5), width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -48,11 +48,11 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.border.withOpacity(0.8), width: 1),
+          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.8), width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.border.withOpacity(0.8), width: 1),
+          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.8), width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),

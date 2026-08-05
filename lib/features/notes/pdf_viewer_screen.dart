@@ -39,10 +39,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     super.initState();
     if (kIsWeb) {
       _launchPdfWeb();
-    } else if (widget.isLocal) {
-      _localFilePath = widget.pdfUrl;
     } else {
-      _downloadPDFForViewing();
+      _checkLocalFile();
     }
   }
 
@@ -54,6 +52,100 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       if (mounted) {
         setState(() {
           _errorMessage = "Could not open PDF in browser.";
+        });
+      }
+    }
+  }
+
+  Future<void> _checkLocalFile() async {
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0.0;
+      _errorMessage = '';
+    });
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      String? localPath;
+
+      if (widget.isLocal) {
+        if (await File(widget.pdfUrl).exists()) {
+          localPath = widget.pdfUrl;
+        }
+      }
+
+      if (localPath == null) {
+        final metaFile = File('${dir.path}/downloads_meta.txt');
+        if (await metaFile.exists()) {
+          final lines = await metaFile.readAsLines();
+          for (final line in lines) {
+            if (line.trim().isEmpty) continue;
+            final parts = line.split('|||');
+            if (parts.length >= 3) {
+              final noteId = parts[0];
+              final title = parts[1];
+              final metaPdfUrl = parts[2];
+
+              if (metaPdfUrl == widget.pdfUrl) {
+                final sanitizedTitle = title.replaceAll(RegExp(r'[^\w\s\.-]'), '_');
+                final path1 = '${dir.path}/${sanitizedTitle}_$noteId.pdf';
+                final path2 = '${dir.path}/$noteId.pdf';
+                if (await File(path1).exists()) {
+                  localPath = path1;
+                  break;
+                } else if (await File(path2).exists()) {
+                  localPath = path2;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if (localPath == null) {
+        if (await File(widget.pdfUrl).exists()) {
+          localPath = widget.pdfUrl;
+        }
+      }
+
+      if (localPath != null) {
+        if (mounted) {
+          setState(() {
+            _localFilePath = localPath;
+            _isDownloading = false;
+            _downloadProgress = 1.0;
+          });
+        }
+        return;
+      }
+
+      bool isOffline = false;
+      try {
+        final lookup = await InternetAddress.lookup('example.com')
+            .timeout(const Duration(seconds: 3));
+        if (lookup.isEmpty || lookup[0].rawAddress.isEmpty) {
+          isOffline = true;
+        }
+      } catch (_) {
+        isOffline = true;
+      }
+
+      if (isOffline) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = "This PDF is not available offline.\nPlease connect to the internet and download it first.";
+            _isDownloading = false;
+          });
+        }
+        return;
+      }
+
+      await _downloadPDFForViewing();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = "This PDF is not available offline.\nPlease connect to the internet and download it first.";
+          _isDownloading = false;
         });
       }
     }
@@ -114,13 +206,21 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          String msg = e.toString();
-          if (msg.startsWith('Exception: ')) {
-            msg = msg.substring(11);
+          final msg = e.toString();
+          if (msg.contains('SocketException') ||
+              msg.contains('ClientException') ||
+              msg.contains('Failed host lookup') ||
+              msg.contains('Connection failed')) {
+            _errorMessage = "This PDF is not available offline.\nPlease connect to the internet and download it first.";
+          } else {
+            String displayMsg = msg;
+            if (displayMsg.startsWith('Exception: ')) {
+              displayMsg = displayMsg.substring(11);
+            }
+            _errorMessage = displayMsg.contains('could not be loaded')
+                ? displayMsg
+                : 'Could not load PDF: $displayMsg';
           }
-          _errorMessage = msg.contains('could not be loaded')
-              ? msg
-              : 'Could not load PDF: $msg';
           _isDownloading = false;
         });
       }
@@ -202,8 +302,8 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                   setState(() => _errorMessage = '');
                   if (kIsWeb) {
                     _launchPdfWeb();
-                  } else if (!widget.isLocal) {
-                    _downloadPDFForViewing();
+                  } else {
+                    _checkLocalFile();
                   }
                 },
                 icon: const Icon(Icons.refresh_rounded),
@@ -250,7 +350,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: const Icon(Icons.picture_as_pdf_rounded,
@@ -344,7 +444,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       decoration: BoxDecoration(
         color: const Color(0xff1a1a2e),
         border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.08))),
+            top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

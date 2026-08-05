@@ -89,7 +89,7 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.white, AppColors.surface.withOpacity(0.5)],
+                colors: [Colors.white, AppColors.surface.withValues(alpha: 0.5)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -97,7 +97,7 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
               border: Border.all(color: AppColors.border, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.05),
+                  color: AppColors.primary.withValues(alpha: 0.05),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -111,7 +111,7 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.auto_awesome, color: AppColors.primary),
@@ -166,7 +166,7 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: gradientColors[0].withOpacity(0.3),
+            color: gradientColors[0].withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -188,7 +188,7 @@ class _DashboardTabState extends ConsumerState<DashboardTab> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(icon, color: Colors.white, size: 24),

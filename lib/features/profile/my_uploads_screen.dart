@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
@@ -141,6 +140,7 @@ class _MyUploadsScreenState extends ConsumerState<MyUploadsScreen> with SingleTi
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
+                  final navigator = Navigator.of(context);
                   try {
                     final svc = ref.read(firestoreServiceProvider);
                     if (isNote) {
@@ -158,10 +158,8 @@ class _MyUploadsScreenState extends ConsumerState<MyUploadsScreen> with SingleTi
                       );
                       await svc.updateQuestionPaper(updated);
                     }
-                    if (mounted) {
-                      Navigator.pop(context);
-                      _fetchUploads();
-                    }
+                    navigator.pop();
+                    if (mounted) _fetchUploads();
                   } catch (e) {
                     // error
                   }

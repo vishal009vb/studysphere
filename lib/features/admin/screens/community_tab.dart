@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
-import '../../../services/firestore_service.dart';
 import '../../../services/auth_service.dart';
 import '../../../services/admin_log_service.dart';
 import '../../../models/post_model.dart';
@@ -17,7 +16,6 @@ class CommunityTab extends ConsumerStatefulWidget {
 
 class _CommunityTabState extends ConsumerState<CommunityTab> {
   Future<void> _deletePost(String id, String contentSnippet) async {
-    final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authServiceProvider).currentUser;
     try {
       await FirebaseFirestore.instance.collection('posts').doc(id).delete();
@@ -45,7 +43,6 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
   }
 
   Future<void> _togglePinPost(String id, bool isCurrentlyPinned, String contentSnippet) async {
-    final firestoreService = ref.read(firestoreServiceProvider);
     final user = ref.read(authServiceProvider).currentUser;
     try {
       await FirebaseFirestore.instance.collection('posts').doc(id).update({

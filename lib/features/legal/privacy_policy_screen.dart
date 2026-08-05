@@ -19,10 +19,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
         ),
         title: Text('Privacy Policy', style: AppTextStyles.headingSmall),
       ),
-      body: SingleChildScrollView(
+      body: const SingleChildScrollView(
         child: Column(
           children: [
-            const LegalHeroHeader(
+            LegalHeroHeader(
               icon: Icons.privacy_tip_rounded,
               title: 'Privacy Policy',
               subtitle: 'Your privacy matters to us.',
@@ -30,10 +30,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
               color: Colors.blueGrey,
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   LegalSection(
                     title: '1. Introduction',
                     content:
@@ -118,10 +118,10 @@ class TermsConditionsScreen extends StatelessWidget {
         ),
         title: Text('Terms & Conditions', style: AppTextStyles.headingSmall),
       ),
-      body: SingleChildScrollView(
+      body: const SingleChildScrollView(
         child: Column(
           children: [
-            const LegalHeroHeader(
+            LegalHeroHeader(
               icon: Icons.description_rounded,
               title: 'Terms & Conditions',
               subtitle: 'Please read these terms carefully before using StudySphere.',
@@ -129,10 +129,10 @@ class TermsConditionsScreen extends StatelessWidget {
               color: Colors.indigo,
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   LegalSection(
                     title: '1. Acceptance of Terms',
                     content:

@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
-import '../../services/auth_service.dart';
 
 const _kSupportEmail = 'vishalbhoi475@gmail.com';
 
@@ -115,7 +114,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.12),
+                  color: AppColors.success.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check_circle_rounded, size: 48, color: AppColors.success),
@@ -186,7 +185,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.support_agent_rounded, size: 38, color: Colors.white),
@@ -205,7 +204,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                     'Describe your issue and our team will get back to you.',
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.85),
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -213,7 +212,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -286,7 +285,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                     _buildLabel('Issue Type *'),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: _selectedIssueType,
+                      initialValue: _selectedIssueType,
                       decoration: _inputDecoration('Select issue type', Icons.category_rounded),
                       items: _issueTypes
                           .map((type) => DropdownMenuItem(
@@ -359,7 +358,7 @@ class _ContactSupportScreenState extends ConsumerState<ContactSupportScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                          disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           elevation: 0,
                         ),

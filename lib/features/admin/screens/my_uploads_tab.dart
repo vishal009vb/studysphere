@@ -5,9 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../services/auth_service.dart';
-import '../../../models/note_model.dart';
-import '../../../models/question_paper_model.dart';
-import '../../upload/upload_bottom_sheet.dart';
 
 class MyUploadsAdminTab extends ConsumerStatefulWidget {
   const MyUploadsAdminTab({super.key});
@@ -96,25 +93,23 @@ class _MyUploadsAdminTabState extends ConsumerState<MyUploadsAdminTab> with Sing
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
               try {
                 await FirebaseFirestore.instance.collection(type).doc(id).update({
                   'title': titleCtrl.text,
                   'subject': subjectCtrl.text,
                 });
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Updated successfully'),
-                    backgroundColor: AppColors.success,
-                  ));
-                }
+                navigator.pop();
+                messenger.showSnackBar(const SnackBar(
+                  content: Text('Updated successfully'),
+                  backgroundColor: AppColors.success,
+                ));
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text('Failed to update: $e'),
-                    backgroundColor: AppColors.error,
+                messenger.showSnackBar(SnackBar(
+                  content: Text('Failed to update: $e'),
+                  backgroundColor: AppColors.error,
                   ));
-                }
               }
             },
             child: const Text('Save'),

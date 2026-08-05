@@ -113,8 +113,10 @@ class AuthService {
 
       // Clear failure tracking on success
       _clearLoginAttempts(cleanEmail);
-      await _updateUserLastLogin(credential.user);
-      await _analyticsService.logLogin('email');
+      if (credential.user != null) {
+        await _syncUserProfile(credential.user!);
+        await _analyticsService.logLogin('email');
+      }
       return credential;
     } on FirebaseAuthException catch (e) {
       // Track failures for wrong credentials â€” not for verified-email or network errors
@@ -131,6 +133,7 @@ class AuthService {
     required String email,
     required String password,
     required String name,
+    required String username,
     String state = '',
     String district = '',
     String taluka = '',
@@ -149,7 +152,7 @@ class AuthService {
           UserModel(
             uid: credential.user!.uid,
             name: name,
-            username: '',
+            username: username.toLowerCase().trim(),
             email: email,
             photoUrl: '',
             role: 'learner',
@@ -163,8 +166,8 @@ class AuthService {
             lastUsageReset: DateTime.now(),
           ),
         );
-        // Send welcome email via authenticated Supabase Edge Function
-        await _sendWelcomeEmail(email, name);
+        // Send welcome email asynchronously in background
+        _sendWelcomeEmail(email, name);
       }
       await _analyticsService.logRegistration('email');
       await _auth.signOut();
@@ -185,7 +188,11 @@ class AuthService {
         googleProvider.addScope('profile');
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
-        // Mobile: use google_sign_in package flow
+        // Mobile: prompt Google account picker cleanly
+        try {
+          await _googleSignIn!.signOut();
+        } catch (_) {}
+
         final GoogleSignInAccount? googleUser = await _googleSignIn!.signIn();
         if (googleUser == null) return null;
 
@@ -200,30 +207,9 @@ class AuthService {
       final user = userCredential.user;
 
       if (user != null) {
-        final docExists = await _firestoreService.userProfileExists(user.uid);
-        if (!docExists) {
-          const role = 'learner';
-          await _firestoreService.createUserProfile(
-            UserModel(
-              uid: user.uid,
-              name: user.displayName ?? 'Student',
-              username: '',
-              email: user.email ?? '',
-              photoUrl: user.photoURL ?? '',
-              role: role,
-              createdAt: DateTime.now(),
-              lastLogin: DateTime.now(),
-              lastUsageReset: DateTime.now(),
-            ),
-          );
-          // Send welcome email via authenticated Supabase Edge Function
-          if (user.email != null) {
-            await _sendWelcomeEmail(user.email!, user.displayName ?? 'Student');
-          }
-        } else {
-          await _updateUserLastLogin(user);
-        }
-        await _analyticsService.logLogin('google');
+        // Sync profile in foreground so it's ready before routing
+        await _syncUserProfile(user);
+        _analyticsService.logLogin('google');
       }
       return userCredential;
     } catch (e) {
@@ -245,6 +231,45 @@ class AuthService {
     if (user != null) {
       await _firestoreService.updateLastLogin(user.uid);
       // Roles are managed strictly via Firestore and admin UI.
+    }
+  }
+
+  /// Checks and syncs user profile in Firestore.
+  Future<void> _syncUserProfile(User user) async {
+    try {
+      final docExists = await _firestoreService
+          .userProfileExists(user.uid)
+          .timeout(const Duration(seconds: 5), onTimeout: () => throw Exception('Timeout checking profile'));
+
+      if (!docExists) {
+        await _firestoreService.createUserProfile(
+          UserModel(
+            uid: user.uid,
+            name: user.displayName ?? 'Student',
+            username: '',
+            email: user.email ?? '',
+            photoUrl: user.photoURL ?? '',
+            role: 'learner',
+            createdAt: DateTime.now(),
+            lastLogin: DateTime.now(),
+            lastUsageReset: DateTime.now(),
+          ),
+        );
+        if (user.email != null) {
+          _sendWelcomeEmail(user.email!, user.displayName ?? 'Student');
+        }
+      } else {
+        await _updateUserLastLogin(user);
+        // Always sync Google photo URL so DP appears correctly
+        if (user.photoURL != null && user.photoURL!.isNotEmpty) {
+          try {
+            await _firestoreService.updateUserField(user.uid, 'photoUrl', user.photoURL!);
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Profile sync failed: $e');
+      rethrow;
     }
   }
 

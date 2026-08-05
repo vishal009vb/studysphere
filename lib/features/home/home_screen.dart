@@ -7,25 +7,20 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/providers/app_cache_provider.dart';
-import '../../core/widgets/shimmer_widgets.dart';
-import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../models/user_model.dart';
 import '../../models/banner_model.dart';
 import '../notes/notes_screen.dart';
-import '../upload/upload_bottom_sheet.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
 import '../community/community_screen.dart';
 import '../profile/profile_screen.dart';
 import 'package:shimmer/shimmer.dart';
-import '../../core/widgets/animated_transition.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../courses/models/course_model.dart';
 import '../courses/course_detail_screen.dart';
 import '../courses/courses_list_screen.dart';
 import '../courses/providers/course_provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -43,6 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   String? _initialSemester;
   String? _initialSearch;
   List<String> _recentSearches = [];
+  List<BannerModel> _banners = [];
 
   late AnimationController _heroAnimController;
   late AnimationController _cardsAnimController;
@@ -52,6 +48,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     // Profile loaded from cache — no direct Firestore call needed here
     _loadRecentSearches();
+    _loadBanners();
 
     _heroAnimController = AnimationController(
       vsync: this,
@@ -93,6 +90,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
     await prefs.setStringList('recent_searches', _recentSearches);
     if (mounted) setState(() {});
+  }
+
+  Future<void> _loadBanners() async {
+    try {
+      final banners =
+          await ref.read(firestoreServiceProvider).fetchActiveBanners();
+      if (mounted) setState(() => _banners = banners);
+    } catch (_) {
+      // Firestore banners optional — static assets used as fallback
+    }
   }
 
   void _handleBannerTap(BannerModel banner) async {
@@ -167,12 +174,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceLowest,
-        border: Border(
+        border: const Border(
           top: BorderSide(color: AppColors.border, width: 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             offset: const Offset(0, -4),
             blurRadius: 20,
           ),
@@ -264,7 +271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           elevation: 0,
           backgroundColor: AppColors.surfaceLowest,
           surfaceTintColor: Colors.transparent,
-          shadowColor: AppColors.primary.withOpacity(0.08),
+          shadowColor: AppColors.primary.withValues(alpha: 0.08),
           forceElevated: true,
           toolbarHeight: 60,
           title: Row(
@@ -292,34 +299,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ],
           ),
           actions: [
-            Container(
-              margin: const EdgeInsets.only(right: 16),
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLowest,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(Icons.notifications_outlined,
-                      color: AppColors.primary, size: 22),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppColors.tertiary,
-                        shape: BoxShape.circle,
-                      ),
+            Consumer(
+              builder: (context, ref, _) {
+                final unreadCount = ref.watch(unreadNotifCountProvider);
+                return GestureDetector(
+                  onTap: () => context.push('/notifications'),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 16),
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLowest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(Icons.notifications_outlined,
+                            color: AppColors.primary, size: 22),
+                        if (unreadCount > 0)
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                color: AppColors.error,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 10,
+                                minHeight: 10,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -359,6 +378,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
               // Banners
               _buildBannerSection(),
+
+              const SizedBox(height: 24),
+
+              // Free Courses
+              _buildFreeCoursesSection(),
 
               const SizedBox(height: 24),
 
@@ -434,7 +458,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   width: 160,
                   height: 160,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.10),
+                    color: Colors.white.withValues(alpha: 0.10),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -446,7 +470,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -474,7 +498,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Text(
                       "Let's continue your\nlearning journey today!",
                       style: AppTextStyles.bodyMedium.copyWith(
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 13,
                         height: 1.4,
                       ),
@@ -521,7 +545,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.06),
+              color: AppColors.primary.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 2),
             ),
@@ -534,7 +558,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             hintStyle: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.onSurfaceVariant,
             ),
-            prefixIcon: Icon(Icons.search_rounded,
+            prefixIcon: const Icon(Icons.search_rounded,
                 color: AppColors.onSurfaceVariant, size: 20),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
@@ -648,7 +672,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: data.cardColor.withOpacity(0.30),
+                color: data.cardColor.withValues(alpha: 0.30),
                 blurRadius: 16,
                 offset: const Offset(0, 6),
               ),
@@ -662,7 +686,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.22),
+                  color: Colors.white.withValues(alpha: 0.22),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(data.icon, color: Colors.white, size: 24),
@@ -681,7 +705,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               Text(
                 data.subtitle,
                 style: AppTextStyles.bodySmall.copyWith(
-                  color: Colors.white.withOpacity(0.78),
+                  color: Colors.white.withValues(alpha: 0.78),
                   fontSize: 11,
                 ),
               ),
@@ -735,7 +759,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha: 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -746,7 +770,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.school_rounded, color: AppColors.primary, size: 28),
@@ -1004,25 +1028,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             onPageChanged: (index, reason) =>
                 setState(() => _currentBannerIndex = index),
           ),
-          items: [
-            'assets/images/banners/banner1.jpg',
-            'assets/images/banners/banner2.jpg',
-            'assets/images/banners/banner3.jpg',
-            'assets/images/banners/banner4.jpg',
-            'assets/images/banners/banner5.jpg',
-          ].map((imagePath) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.asset(imagePath,
-                  fit: BoxFit.cover, width: double.infinity),
-            );
-          }).toList(),
+          items: _banners.isNotEmpty
+              ? _banners.map((banner) {
+                  return GestureDetector(
+                    onTap: () => _handleBannerTap(banner),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: CachedNetworkImage(
+                        imageUrl: banner.imageUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        errorWidget: (_, __, ___) => Container(
+                          color: AppColors.surfaceVariant,
+                          child: const Icon(Icons.image_not_supported_outlined),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList()
+              : [
+                  'assets/images/banners/banner1.jpg',
+                  'assets/images/banners/banner2.jpg',
+                  'assets/images/banners/banner3.jpg',
+                  'assets/images/banners/banner4.jpg',
+                  'assets/images/banners/banner5.jpg',
+                ].map((imagePath) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset(imagePath,
+                        fit: BoxFit.cover, width: double.infinity),
+                  );
+                }).toList(),
         ),
         const SizedBox(height: 10),
         // Dots indicator
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(5, (index) {
+          children: List.generate(_banners.isNotEmpty ? _banners.length : 5, (index) {
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               width: _currentBannerIndex == index ? 20.0 : 6.0,
@@ -1081,7 +1123,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.description_outlined,
+                const Icon(Icons.description_outlined,
                     color: AppColors.onSurfaceVariant, size: 40),
                 const SizedBox(height: 8),
                 Text('No notes yet. Be the first to upload!',
@@ -1143,7 +1185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 Container(
                                   padding: const EdgeInsets.all(7),
                                   decoration: BoxDecoration(
-                                    color: color.withOpacity(0.12),
+                                    color: color.withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Icon(Icons.description_rounded,
@@ -1187,7 +1229,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             const SizedBox(height: 10),
                             Row(
                               children: [
-                                Icon(Icons.download_rounded,
+                                const Icon(Icons.download_rounded,
                                     size: 13,
                                     color: AppColors.onSurfaceVariant),
                                 const SizedBox(width: 3),
@@ -1195,7 +1237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                     style: AppTextStyles.bodySmall
                                         .copyWith(fontSize: 11)),
                                 const SizedBox(width: 10),
-                                Icon(Icons.favorite_rounded,
+                                const Icon(Icons.favorite_rounded,
                                     size: 13, color: AppColors.tertiary),
                                 const SizedBox(width: 3),
                                 Text('${note.likes}',
@@ -1273,15 +1315,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
   }
-
-  void _showUploadBottomSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const UploadBottomSheet(),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1303,29 +1336,6 @@ class _QuickActionData {
   });
 }
 
-class _CourseData {
-  final String title;
-  final String subtitle;
-  final Color color;
-  final String initial;
-  final double progress;
-  final String course;
-  final String semester;
-
-  const _CourseData({
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.initial,
-    required this.progress,
-    this.course = 'BCA',
-    this.semester = '',
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Student Illustration Painter — matches Figma hero avatar
-// ─────────────────────────────────────────────────────────────────────────────
 class _StudentPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

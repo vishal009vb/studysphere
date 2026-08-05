@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 void main() async {
-  final baseUrl = 'https://firestore.googleapis.com/v1/projects/studysphere-app-3a480/databases/(default)/documents/courses';
+  const baseUrl = 'https://firestore.googleapis.com/v1/projects/studysphere-app-3a480/databases/(default)/documents/courses';
 
   // Step 1: Delete all existing courses
   print('Deleting old courses...');

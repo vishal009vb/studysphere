@@ -1,4 +1,4 @@
-﻿rules_version = '2';
+rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -40,7 +40,7 @@ service cloud.firestore {
     // Direct client writes to these fields are BLOCKED here.
 
     function isAttemptingRateLimitWrite() {
-      return request.resource.data.keys().hasAny(['dailyUsageCount', 'lastResetDate']);
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyUsageCount', 'lastResetDate']);
     }
 
     // ── Input size guards ─────────────────────────────────────────────────────
@@ -55,13 +55,18 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
 
-      allow update: if isSignedIn()
-                    && request.auth.uid == userId
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isBanned', 'isSuspended', 'isVerified', 'reputationPoints', 'contributorRank'])
-                    && !isAttemptingRateLimitWrite()
-                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyAiUsage', 'lastUsageReset'])
-                        || (request.resource.data.dailyAiUsage == resource.data.dailyAiUsage + 1)
-                        || (request.resource.data.dailyAiUsage == 1 && request.resource.data.lastUsageReset != resource.data.lastUsageReset));
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isBanned', 'isSuspended', 'isVerified', 'reputationPoints', 'contributorRank'])
+          && !isAttemptingRateLimitWrite()
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyAiUsage', 'lastUsageReset'])
+              || (request.resource.data.dailyAiUsage == resource.data.dailyAiUsage + 1)
+              || (request.resource.data.dailyAiUsage == 1 && request.resource.data.lastUsageReset != resource.data.lastUsageReset)))
+        ||
+        (request.auth.uid != userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount'])
+          && (request.resource.data.followersCount == resource.data.followersCount + 1 || request.resource.data.followersCount == resource.data.followersCount - 1))
+      );
 
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow delete: if isSignedIn() && request.auth.uid == userId;
@@ -236,13 +241,19 @@ service cloud.firestore {
 
     match /notifications/{notificationId} {
       allow read: if isSignedIn()
-                  && resource.data.receiverId == request.auth.uid;
+                  && (resource == null || resource.data.receiverId == request.auth.uid);
       allow create: if isSignedIn();
       allow update: if isSignedIn()
                     && resource.data.receiverId == request.auth.uid;
       allow delete: if isSignedIn()
                     && resource.data.receiverId == request.auth.uid;
     }
+
+    match /global_notifications/{notificationId} {
+      allow read: if true;
+      allow create, update, delete: if isAdminOrModerator();
+    }
+
 
     // ── Admin Logs Collection ────────────────────────────────────────────────
 

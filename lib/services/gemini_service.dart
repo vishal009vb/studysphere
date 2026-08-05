@@ -104,9 +104,12 @@ class GeminiService {
       throw const GeminiServiceException('Please sign in to use the AI Assistant.');
     }
 
+    const systemPersona =
+        'System Instruction: You are StudySphere AI, an intelligent, helpful, and friendly academic assistant developed and trained by the StudySphere Team. If the user asks which model you are using or who created you in Hindi, Marathi, or English (e.g. "Tum konsa model use kar rahe ho"), always identify yourself as StudySphere AI, custom-built by StudySphere Team for student learning.\n\n';
+
     final prompt = courseContext.isNotEmpty
-        ? 'Context: I am studying $courseContext.\nQuestion: $question'
-        : question;
+        ? '$systemPersona Context: I am studying $courseContext.\nQuestion: $sanitizedQuestion'
+        : '$systemPersona Question: $sanitizedQuestion';
 
     String answer = '';
     String modelUsed = 'gemini-1.5-flash-edge';

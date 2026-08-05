@@ -91,21 +91,31 @@ class UserModel {
       contributorRank: map['contributorRank'] ?? 'Bronze Contributor',
       reputationPoints: map['reputationPoints'] ?? 0,
       dailyAiUsage: map['dailyAiUsage'] ?? 0,
-      lastUsageReset: (map['lastUsageReset'] as dynamic)?.toDate(),
+      lastUsageReset: _parseDate(map['lastUsageReset']),
       state: map['state'] ?? '',
       district: map['district'] ?? '',
       subDistrict: map['subDistrict'] ?? '',
       collegeId: map['collegeId'] ?? '',
       collegeName: map['collegeName'] ?? '',
       gender: map['gender'] ?? 'female',
-      createdAt: (map['createdAt'] as dynamic)?.toDate() ?? DateTime.now(),
-      lastLogin: (map['lastLogin'] as dynamic)?.toDate() ?? DateTime.now(),
+      createdAt: _parseDate(map['createdAt']) ?? DateTime.now(),
+      lastLogin: _parseDate(map['lastLogin']) ?? DateTime.now(),
       isBanned: map['isBanned'] ?? false,
       isSuspended: map['isSuspended'] ?? false,
       isVerified: map['isVerified'] ?? false,
       usernameChangeCount: map['usernameChangeCount'] ?? 0,
       fcmToken: map['fcmToken'],
     );
+  }
+
+  static DateTime? _parseDate(dynamic date) {
+    if (date == null) return null;
+    if (date is DateTime) return date;
+    try {
+      return (date as dynamic).toDate();
+    } catch (_) {
+      return null;
+    }
   }
 
   Map<String, dynamic> toMap() {
@@ -202,7 +212,7 @@ class UserModel {
       collegeId: collegeId ?? this.collegeId,
       collegeName: collegeName ?? this.collegeName,
       gender: gender ?? this.gender,
-      createdAt: this.createdAt,
+      createdAt: createdAt,
       lastLogin: lastLogin ?? this.lastLogin,
       isBanned: isBanned ?? this.isBanned,
       isSuspended: isSuspended ?? this.isSuspended,

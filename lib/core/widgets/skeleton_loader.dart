@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-import '../constants/app_colors.dart';
 
 class SkeletonLoader extends StatelessWidget {
   final double width;
@@ -45,23 +44,23 @@ class SkeletonLoader extends StatelessWidget {
 
   // Pre-configured loading placeholders
   static Widget listTilePlaceholder() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SkeletonLoader(width: 50, height: 50, borderRadius: 12),
-          const SizedBox(width: 16),
+          SkeletonLoader(width: 50, height: 50, borderRadius: 12),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SkeletonLoader(width: double.infinity, height: 16),
-                const SizedBox(height: 8),
-                const SkeletonLoader(width: 150, height: 12),
-                const SizedBox(height: 8),
+                SkeletonLoader(width: double.infinity, height: 16),
+                SizedBox(height: 8),
+                SkeletonLoader(width: 150, height: 12),
+                SizedBox(height: 8),
                 Row(
-                  children: const [
+                  children: [
                     SkeletonLoader(width: 40, height: 10),
                     SizedBox(width: 12),
                     SkeletonLoader(width: 40, height: 10),

@@ -83,7 +83,7 @@ class _QuizScreenState extends State<QuizScreen> {
           preferredSize: const Size.fromHeight(4),
           child: LinearProgressIndicator(
             value: (_currentQuestionIndex + 1) / _dummyQuestions.length,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
           ),
         ),
@@ -126,11 +126,11 @@ class _QuizScreenState extends State<QuizScreen> {
 
             if (_selectedAnswerIndex != null) {
               if (isCorrectOption) {
-                bgColor = AppColors.success.withOpacity(0.1);
+                bgColor = AppColors.success.withValues(alpha: 0.1);
                 borderColor = AppColors.success;
                 textColor = AppColors.success;
               } else if (isSelected && !isCorrectOption) {
-                bgColor = AppColors.error.withOpacity(0.1);
+                bgColor = AppColors.error.withValues(alpha: 0.1);
                 borderColor = AppColors.error;
                 textColor = AppColors.error;
               }
@@ -182,7 +182,7 @@ class _QuizScreenState extends State<QuizScreen> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.1),
+                color: AppColors.success.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.emoji_events_rounded, color: AppColors.success, size: 64),

@@ -48,7 +48,7 @@ class PDFPreviewCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.12),
+                        color: AppColors.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(
@@ -139,7 +139,7 @@ class PDFPreviewCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.border.withOpacity(0.5),
+        color: AppColors.border.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(

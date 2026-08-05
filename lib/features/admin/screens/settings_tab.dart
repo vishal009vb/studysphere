@@ -106,7 +106,7 @@ class _SettingsTabState extends ConsumerState<SettingsTab> {
                     subtitle: const Text('If enabled, regular users cannot access the app.'),
                     value: _maintenanceMode,
                     onChanged: (val) => _updateSettings(val, _maxAiRequests),
-                    activeColor: AppColors.error,
+                    activeThumbColor: AppColors.error,
                   ),
                   const Divider(),
                   ListTile(

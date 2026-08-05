@@ -166,13 +166,13 @@ class _AiScraperTabState extends ConsumerState<AiScraperTab> {
       _loadNotes();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Bulk \$action successful.'), backgroundColor: AppColors.success),
+          const SnackBar(content: Text('Bulk \$action successful.'), backgroundColor: AppColors.success),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
+          const SnackBar(content: Text('Failed: \$e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -211,7 +211,7 @@ class _AiScraperTabState extends ConsumerState<AiScraperTab> {
                     const SizedBox(width: 8),
                     DropdownButton<String>(
                       value: _searchField,
-                      items: ['title', 'subject'].map((e) => DropdownMenuItem(value: e, child: Text('By \$e'))).toList(),
+                      items: ['title', 'subject'].map((e) => DropdownMenuItem(value: e, child: const Text('By \$e'))).toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setState(() => _searchField = val);
@@ -226,10 +226,10 @@ class _AiScraperTabState extends ConsumerState<AiScraperTab> {
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                     child: Row(
                       children: [
-                        Text('\${_selectedIds.length} items selected', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('\${_selectedIds.length} items selected', style: TextStyle(fontWeight: FontWeight.bold)),
                         const Spacer(),
                         ElevatedButton.icon(
                           icon: const Icon(Icons.check, size: 16),
@@ -277,7 +277,7 @@ class _AiScraperTabState extends ConsumerState<AiScraperTab> {
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: DataTable(
-                              headingRowColor: MaterialStateProperty.all(AppColors.surface),
+                              headingRowColor: WidgetStateProperty.all(AppColors.surface),
                               onSelectAll: (selected) {
                                 setState(() {
                                   if (selected == true) {
@@ -336,7 +336,7 @@ class _AiScraperTabState extends ConsumerState<AiScraperTab> {
                                       ),
                                     ],
                                   );
-                                }).toList(),
+                                }),
                                 if (_isFetchingMore)
                                   const DataRow(cells: [
                                     DataCell(CircularProgressIndicator()),

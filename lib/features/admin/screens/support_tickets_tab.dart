@@ -162,7 +162,7 @@ class _SupportTicketsTabState extends State<SupportTicketsTab> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: _statusColor(status).withOpacity(0.1),
+                                          color: _statusColor(status).withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
@@ -207,7 +207,7 @@ class _SupportTicketsTabState extends State<SupportTicketsTab> {
                                         children: ['Pending', 'In Progress', 'Resolved', 'Closed'].map((s) {
                                           return ActionChip(
                                             label: Text(s),
-                                            backgroundColor: _statusColor(s).withOpacity(0.1),
+                                            backgroundColor: _statusColor(s).withValues(alpha: 0.1),
                                             labelStyle: TextStyle(color: _statusColor(s), fontWeight: FontWeight.bold),
                                             onPressed: () => _updateStatus(ticket['id'], s),
                                           );

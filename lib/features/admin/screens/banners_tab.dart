@@ -95,7 +95,7 @@ class _BannersTabState extends ConsumerState<BannersTab> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     DropdownButtonFormField<String>(
-                      value: type,
+                      initialValue: type,
                       items: const [
                         DropdownMenuItem(value: 'none', child: Text('None')),
                         DropdownMenuItem(value: 'notes', child: Text('Notes Filter')),

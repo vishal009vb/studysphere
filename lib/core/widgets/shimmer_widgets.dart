@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 import '../constants/app_colors.dart';
 
@@ -31,7 +31,7 @@ class NoteCardShimmer extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       child: Row(
         children: [
@@ -83,8 +83,8 @@ class BannerShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: AppColors.primary.withOpacity(0.3),
-      highlightColor: AppColors.primary.withOpacity(0.5),
+      baseColor: AppColors.primary.withValues(alpha: 0.3),
+      highlightColor: AppColors.primary.withValues(alpha: 0.5),
       child: Container(
         height: 160,
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -213,8 +213,8 @@ class HeroShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: AppColors.primary.withOpacity(0.4),
-      highlightColor: AppColors.primary.withOpacity(0.6),
+      baseColor: AppColors.primary.withValues(alpha: 0.4),
+      highlightColor: AppColors.primary.withValues(alpha: 0.6),
       child: Container(
         height: 150,
         margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),

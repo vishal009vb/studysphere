@@ -27,7 +27,7 @@ class LegalHeroHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [color.withOpacity(0.85), color],
+          colors: [color.withValues(alpha: 0.85), color],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -38,7 +38,7 @@ class LegalHeroHeader extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 34, color: Colors.white),
@@ -57,7 +57,7 @@ class LegalHeroHeader extends StatelessWidget {
             subtitle,
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
             textAlign: TextAlign.center,
           ),
@@ -65,7 +65,7 @@ class LegalHeroHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(

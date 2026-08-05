@@ -67,7 +67,7 @@ class AdminSidebarWidget extends ConsumerWidget {
                     ),
                   ),
                   selected: isSelected,
-                  selectedTileColor: AppColors.primary.withOpacity(0.1),
+                  selectedTileColor: AppColors.primary.withValues(alpha: 0.1),
                   onTap: () => onItemSelected(index),
                 );
               },
