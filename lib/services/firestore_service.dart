@@ -1122,7 +1122,9 @@ class FirestoreService {
           return list;
         })
         .handleError((e) {
-          debugPrint("Error streaming user notifications: $e");
+          // Silently return empty list — permission errors occur briefly during
+          // sign-out/sign-in transitions and are not actionable by the user.
+          debugPrint("User notifications unavailable: $e");
           return <NotificationModel>[];
         });
   }
@@ -1321,12 +1323,11 @@ class FirestoreService {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     return _db
         .collection('global_notifications')
-        // Was an unbounded listener on the entire collection for the whole app
-        // session. isActive is now filtered server-side and the result is
-        // capped to the newest 20, matching the 30-day client-side window.
-        .where('isActive', isEqualTo: true)
+        // NOTE: Removed server-side isActive filter to avoid needing a
+        // composite index (isActive + createdAt). Filtering is done
+        // client-side below, which is equivalent for this small collection.
         .orderBy('createdAt', descending: true)
-        .limit(20)
+        .limit(40)
         .snapshots()
         .map((snap) {
       final list = snap.docs
@@ -1342,11 +1343,12 @@ class FirestoreService {
             }
             return true;
           })
+          .take(20)
           .toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
     }).handleError((e) {
-      debugPrint("Error streaming global announcements: $e");
+      debugPrint("Global announcements unavailable: $e");
       return <GlobalNotificationModel>[];
     });
   }

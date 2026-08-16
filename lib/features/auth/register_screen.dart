@@ -10,6 +10,7 @@ import '../../services/location_service.dart';
 import '../../services/college_service.dart';
 import 'widgets/college_search_dialog.dart';
 import '../../core/widgets/animated_transition.dart';
+import '../../core/utils/app_error_formatter.dart';
 import 'dart:async';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -276,7 +277,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(AppErrorFormatter.getFriendlyMessage(e)),
             backgroundColor: AppColors.error,
           ),
         );
