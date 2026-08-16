@@ -224,6 +224,9 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
             content: p.content,
             attachedType: p.attachedType,
             attachedId: p.attachedId,
+            attachedUrl: p.attachedUrl,           // ✅ Fix: photo/file URL preserve करा
+            attachedFileName: p.attachedFileName, // ✅ Fix: question paper name preserve करा
+            attachedFileSize: p.attachedFileSize, // ✅ Fix: file size preserve करा
             likes: p.likes + delta,
             commentsCount: p.commentsCount,
             reposts: p.reposts,
