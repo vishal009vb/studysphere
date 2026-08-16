@@ -26,7 +26,14 @@ class AdminLogService {
     });
   }
 
-  Stream<QuerySnapshot> getLogsStream() {
-    return _db.collection('adminLogs').orderBy('timestamp', descending: true).snapshots();
+  /// Live admin audit log. Bounded — `adminLogs` is append-only and grows
+  /// forever, so an unlimited listener re-read the entire history on every
+  /// admin action.
+  Stream<QuerySnapshot> getLogsStream({int limit = 100}) {
+    return _db
+        .collection('adminLogs')
+        .orderBy('timestamp', descending: true)
+        .limit(limit)
+        .snapshots();
   }
 }

@@ -13,6 +13,7 @@ import '../core/widgets/splash_ui.dart';
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
+import '../features/auth/google_profile_setup_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/onboarding/preferences_screen.dart';
 import '../features/home/home_screen.dart';
@@ -52,6 +53,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = location == '/login' ||
           location == '/register' ||
           location == '/forgot-password' ||
+          location == '/google-profile-setup' ||
           location == '/admin-login';
 
       final isOnboardingRoute =
@@ -75,7 +77,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         final isOfflineAllowed = location == '/' ||
             location.startsWith('/downloads') ||
             location.startsWith('/offline-downloads') ||
-            location.startsWith('/pdf-viewer');
+            location.startsWith('/pdf-viewer') ||
+            location == '/terms' ||
+            location == '/privacy';
         if (isOfflineAllowed) {
           return null;
         }
@@ -119,6 +123,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: '/google-profile-setup',
+        builder: (context, state) => const GoogleProfileSetupScreen(),
       ),
       GoRoute(
         path: '/forgot-password',

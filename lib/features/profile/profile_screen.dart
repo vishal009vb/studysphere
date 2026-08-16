@@ -423,78 +423,164 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       builder: (context) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Account Settings',
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Account Settings',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.support_agent_rounded, color: Colors.teal),
-                  title: const Text('Contact Support'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/contact');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.privacy_tip_rounded, color: Colors.blueGrey),
-                  title: const Text('Privacy Policy'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/privacy');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.description_rounded, color: Colors.indigo),
-                  title: const Text('Terms & Conditions'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/terms');
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
-                  title: const Text('Delete Account'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/delete-account');
-                  },
-                ),
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.logout_rounded, color: AppColors.error),
-                  title: const Text('Sign Out', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold)),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _signOut();
-                  },
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.share_rounded, color: AppColors.primary, size: 20),
+                    ),
+                    title: Text('Share Profile', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _shareProfile();
+                    },
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.qr_code_2_rounded, color: AppColors.primary, size: 20),
+                    ),
+                    title: Text('My QR Code', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showQrCodeDialog();
+                    },
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.support_agent_rounded, color: Colors.teal, size: 20),
+                    ),
+                    title: Text('Contact Support', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/contact');
+                    },
+                  ),
+                  const Divider(height: 16, indent: 20, endIndent: 20),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blueGrey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.privacy_tip_rounded, color: Colors.blueGrey, size: 20),
+                    ),
+                    title: Text('Privacy Policy', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/privacy');
+                    },
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.description_rounded, color: Colors.indigo, size: 20),
+                    ),
+                    title: Text('Terms & Conditions', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/terms');
+                    },
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.people_rounded, color: Color(0xFF7C3AED), size: 20),
+                    ),
+                    title: Text('Community Rules', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/community-guidelines');
+                    },
+                  ),
+                  const Divider(height: 16, indent: 20, endIndent: 20),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.delete_forever_rounded, color: AppColors.error, size: 20),
+                    ),
+                    title: Text('Delete Account', style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: AppColors.error)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/delete-account');
+                    },
+                  ),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
+                    ),
+                    title: Text('Sign Out', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: AppColors.error)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _signOut();
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
           ),
         );
@@ -1315,57 +1401,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             error: (err, stack) => Center(child: Text('Error: $err')),
           ),
 
-          const SizedBox(height: 20),
-
-          // ── Original Course tag ────────────────────────────────
-          _buildInfoCard(
-            icon: Icons.school_rounded,
-            label: 'My Course',
-            value: _profile!.coursePreference.isNotEmpty
-                ? _profile!.coursePreference
-                : 'Not set',
-            color: AppColors.primary,
-          ),
-          const SizedBox(height: 12),
-
-          if (_profile!.collegeName.isNotEmpty) ...[
-            _buildInfoCard(
-              icon: Icons.account_balance_rounded,
-              label: 'College',
-              value: _profile!.collegeName,
-              color: AppColors.primary,
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          if (_profile!.state.isNotEmpty) ...[
-
-                _buildInfoCard(
-                  icon: Icons.location_on_rounded,
-                  label: 'Location',
-                  value: '${_profile!.subDistrict}, ${_profile!.district}, ${_profile!.state}',
-                  color: AppColors.primary,
-                ),
-                const SizedBox(height: 12),
-              ],
-
-          // Rep points
-          _buildInfoCard(
-            icon: Icons.military_tech_rounded,
-            label: 'Reputation Points',
-            value: '${_profile!.reputationPoints} pts',
-            color: AppColors.warning,
-          ),
-          const SizedBox(height: 12),
-
-          // Member since
-          _buildInfoCard(
-            icon: Icons.calendar_today_rounded,
-            label: 'Member Since',
-            value: _formatDate(_profile!.createdAt),
-            color: AppColors.accent,
-          ),
-
           const SizedBox(height: 24),
 
           // Upgrade CTA (only for learners)
@@ -1436,32 +1471,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
           const SizedBox(height: 8),
           _buildQuickLink(
               Icons.forum_rounded, 'Community Feed', '/community', const Color(0xff7c3aed)),
-          const SizedBox(height: 24),
-          Text('Support & Legal', style: AppTextStyles.headingSmall),
-          const SizedBox(height: 10),
-          // Compact 2-column grid for legal items
-          GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 3.2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _buildCompactLink(Icons.support_agent_rounded, 'Contact Support', '/contact', Colors.teal),
-              _buildCompactLink(Icons.privacy_tip_rounded, 'Privacy Policy', '/privacy', Colors.blueGrey),
-              _buildCompactLink(Icons.description_rounded, 'Terms & Conditions', '/terms', Colors.indigo),
-              _buildCompactLink(Icons.people_rounded, 'Community Rules', '/community-guidelines', const Color(0xFF7C3AED)),
-              _buildCompactLink(Icons.copyright_rounded, 'Copyright Policy', '/copyright-policy', Colors.deepOrange),
-              _buildCompactLink(Icons.smart_toy_rounded, 'AI Disclaimer', '/ai-disclaimer', AppColors.blue),
-              _buildCompactLink(Icons.folder_special_rounded, 'Content Disclaimer', '/content-disclaimer', Colors.teal),
-              _buildCompactLink(Icons.delete_forever_rounded, 'Delete Account', '/delete-account', AppColors.error),
-            ],
-          ),
           if (_profile?.role == 'admin') ...[
-            const SizedBox(height: 24),
-            Text('Admin Center', style: AppTextStyles.headingSmall),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             _buildQuickLink(Icons.admin_panel_settings_rounded, 'Admin Dashboard',
                 '/admin', AppColors.error),
           ],

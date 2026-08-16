@@ -81,12 +81,21 @@ class _CommunityTabState extends ConsumerState<CommunityTab> {
     );
   }
 
+  // Held in a field so a rebuild reuses the same listener instead of tearing
+  // it down and re-reading the collection. Bounded — this had no limit and
+  // streamed the entire posts collection.
+  late final Stream<QuerySnapshot> _postsStream = FirebaseFirestore.instance
+      .collection('posts')
+      .orderBy('createdAt', descending: true)
+      .limit(50)
+      .snapshots();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('posts').orderBy('createdAt', descending: true).snapshots(),
+        stream: _postsStream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(child: Text('Error loading posts: ${snapshot.error}', style: AppTextStyles.bodyMedium));
@@ -230,6 +239,15 @@ class _AdminCommentsDialogState extends ConsumerState<_AdminCommentsDialog> {
     }
   }
 
+  // Bounded and hoisted out of build(). Includes replies — admins moderate
+  // those too — so no parentId filter here.
+  late final Stream<QuerySnapshot> _commentsStream = FirebaseFirestore.instance
+      .collection('comments')
+      .where('contentId', isEqualTo: widget.postId)
+      .orderBy('createdAt', descending: false)
+      .limit(100)
+      .snapshots();
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -250,11 +268,7 @@ class _AdminCommentsDialogState extends ConsumerState<_AdminCommentsDialog> {
             const Divider(),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('comments')
-                    .where('contentId', isEqualTo: widget.postId)
-                    .orderBy('createdAt', descending: false)
-                    .snapshots(),
+                stream: _commentsStream,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) return Center(child: Text('Error: ${snapshot.error}'));
                   if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());

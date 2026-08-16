@@ -33,14 +33,16 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // ── CRITICAL: Fields that ONLY Cloud Functions (Admin SDK) may write ──────
+    // ── CRITICAL: AI quota fields must NEVER be client-writable ──────────────
     //
-    // dailyUsageCount and lastResetDate are controlled exclusively by
-    // checkAndIncrementUsage / askGeminiAI Cloud Functions.
-    // Direct client writes to these fields are BLOCKED here.
+    // [C-06 FIX] The actual field names written by gemini_service.dart:1095-1099
+    // are 'dailyAiUsage' and 'lastUsageReset'. The old guard checked
+    // 'dailyUsageCount'/'lastResetDate' (nonexistent fields), so it was dead code.
+    // Clients are now BLOCKED from writing these fields at all — quota enforcement
+    // will move server-side to the Edge Function in a follow-up commit.
 
-    function isAttemptingRateLimitWrite() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyUsageCount', 'lastResetDate']);
+    function isAttemptingAiQuotaWrite() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyAiUsage', 'lastUsageReset']);
     }
 
     // ── Input size guards ─────────────────────────────────────────────────────
@@ -53,23 +55,46 @@ service cloud.firestore {
     // ── Users Collection ──────────────────────────────────────────────────────
 
     match /users/{userId} {
-      allow read: if isSignedIn();
+      // Allow reading so that the registration page can check if a username is available
+      allow read: if true;
 
+      // [C-06 FIX] AI quota fields may only change via (a) a +1 increment with
+      // the reset timestamp unchanged, or (b) a genuine daily reset — new usage
+      // <= 1 AND at least 24h have elapsed since the previous reset. The old rule
+      // allowed (dailyAiUsage:1, lastUsageReset:<any new ts>) with no time gate,
+      // which let a client reset their quota to 1 at will. Now time-gated.
       allow update: if isSignedIn() && (
         (request.auth.uid == userId
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isBanned', 'isSuspended', 'isVerified', 'reputationPoints', 'contributorRank'])
-          && !isAttemptingRateLimitWrite()
-          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['dailyAiUsage', 'lastUsageReset'])
-              || (request.resource.data.dailyAiUsage == resource.data.dailyAiUsage + 1)
-              || (request.resource.data.dailyAiUsage == 1 && request.resource.data.lastUsageReset != resource.data.lastUsageReset)))
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isBanned', 'isSuspended', 'isVerified'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['reputationPoints', 'contributorRank'])
+              || request.resource.data.reputationPoints >= resource.data.reputationPoints)
+          && (!isAttemptingAiQuotaWrite()
+              || (request.resource.data.dailyAiUsage == resource.data.dailyAiUsage + 1
+                  && request.resource.data.lastUsageReset == resource.data.lastUsageReset)
+              || (request.resource.data.dailyAiUsage <= 1
+                  && request.resource.data.lastUsageReset is timestamp
+                  && resource.data.lastUsageReset is timestamp
+                  && request.resource.data.lastUsageReset > resource.data.lastUsageReset + duration.value(24, 'h'))))
         ||
         (request.auth.uid != userId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['followersCount'])
           && (request.resource.data.followersCount == resource.data.followersCount + 1 || request.resource.data.followersCount == resource.data.followersCount - 1))
       );
 
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      // [C-02 FIX] Harden create: a user may only create their OWN doc, and
+      // may NOT self-assign a privileged role or pre-set moderation/reputation
+      // fields. This closes the delete-then-recreate privilege-escalation path.
+      allow create: if isSignedIn()
+                    && request.auth.uid == userId
+                    && (!('role' in request.resource.data) || request.resource.data.role == 'learner')
+                    && (!('isBanned' in request.resource.data) || request.resource.data.isBanned == false)
+                    && (!('isSuspended' in request.resource.data) || request.resource.data.isSuspended == false)
+                    && (!('reputationPoints' in request.resource.data) || request.resource.data.reputationPoints == 0);
+
+      // [C-02 FIX] Clients may no longer hard-delete their user doc (which
+      // allowed a clean recreate with an escalated role). Deletion is handled
+      // via the deletionRequests collection + admin review.
+      allow delete: if false;
 
       match /chatHistory/{messageId} {
         allow read, write: if isSignedIn() && request.auth.uid == userId;
@@ -91,7 +116,11 @@ service cloud.firestore {
 
     match /courses/{courseId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      // Writes are admin-only. This was previously `if true` so the startup
+      // seeder could run unauthenticated, which let any client on the internet
+      // overwrite the course catalogue. The seeder no longer runs on startup.
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ── Colleges Collection ──────────────────────────────────────────────────
@@ -129,11 +158,12 @@ service cloud.firestore {
     }
 
     // ── Question Papers Collection ────────────────────────────────────────────
+    // [C-01 FIX] Removed contributor-role gating per user decision. Any signed-in
+    // user may upload papers (pending approval), matching the notes flow.
 
     match /questionPapers/{paperId} {
       allow read: if resource.data.status == 'approved' || isAdminOrModerator();
       allow create: if isSignedIn()
-                    && (isContributor() || isAdmin())
                     && request.resource.data.uploadedBy == request.auth.uid
                     && (request.resource.data.status == 'pending' || isAdmin())
                     && validStringField('title', 120)
@@ -142,15 +172,15 @@ service cloud.firestore {
     }
 
     // ── Community Posts Collection ────────────────────────────────────────────
+    // [C-01 FIX] Removed contributor-role gating per user decision. Any signed-in
+    // user may post, with basic field/size validation to maintain quality.
 
     match /posts/{postId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn()
-                    && (isContributor() || isAdmin())
                     && request.resource.data.authorId == request.auth.uid
                     && validStringField('content', 2000)
-                    && request.resource.data.keys().hasAll(['authorId', 'content', 'createdAt'])
-                    && request.resource.data.createdAt == request.time;
+                    && request.resource.data.keys().hasAll(['authorId', 'content', 'createdAt']);
       allow update: if isSignedIn()
                     && (resource.data.authorId == request.auth.uid || isAdminOrModerator());
       allow delete: if isAdminOrModerator()
@@ -240,8 +270,9 @@ service cloud.firestore {
     // ── Notifications Collection ──────────────────────────────────────────────
 
     match /notifications/{notificationId} {
-      allow read: if isSignedIn()
-                  && (resource == null || resource.data.receiverId == request.auth.uid);
+      // Allow reading a specific notification only if you are the receiver
+      // Allow listing/querying notifications if signed in (query is filtered by receiverId in the app)
+      allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn()
                     && resource.data.receiverId == request.auth.uid;

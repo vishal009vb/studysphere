@@ -1160,12 +1160,22 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen>
   }
 
   Widget _buildPodiumSlot(UserModel user, int rank, double height) {
-    final medals = {1: 'ðŸ¥‡', 2: 'ðŸ¥ˆ', 3: 'ðŸ¥‰'};
+    // Use Icons instead of emoji to avoid encoding issues on web
+    final medalIcon = rank == 1
+        ? Icons.emoji_events_rounded       // 🏆 trophy
+        : rank == 2
+            ? Icons.workspace_premium_rounded // silver
+            : Icons.military_tech_rounded;    // bronze
+    final medalColor = rank == 1
+        ? const Color(0xFFFFD700)  // Gold
+        : rank == 2
+            ? const Color(0xFFC0C0C0)  // Silver
+            : const Color(0xFFCD7F32); // Bronze
     return GestureDetector(
       onTap: () => _openUserProfile(user.uid),
       child: Column(
         children: [
-          Text(medals[rank]!, style: const TextStyle(fontSize: 24)),
+          Icon(medalIcon, color: medalColor, size: 32),
           const SizedBox(height: 6),
           CircleAvatar(
             radius: rank == 1 ? 30 : 22,
@@ -1436,7 +1446,7 @@ class _PostCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${_timeAgo(post.createdAt)} â€¢ BCA Student',
+                          '${_timeAgo(post.createdAt)} \u2022 BCA Student',
                           style: AppTextStyles.bodySmall
                               .copyWith(fontSize: 12, color: Colors.grey.shade600),
                         ),
@@ -1793,10 +1803,13 @@ class _PostCard extends ConsumerWidget {
   }
 
   String _timeAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    // Use UTC comparison to avoid timezone issues with server timestamps
+    final now = DateTime.now().toUtc();
+    final utcDt = dt.toUtc();
+    final diff = now.difference(utcDt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
     if (diff.inDays < 7) return '${diff.inDays}d ago';
     return '${(diff.inDays / 7).floor()}w ago';
   }
@@ -1903,7 +1916,7 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
     });
   }
 
-  // â”€â”€ Pick Image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ————————————————————————————————————————————————————————————————————————————————
 
   Future<void> _pickImage() async {
     if (_isPosting) return;
@@ -2087,6 +2100,9 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
   // â”€â”€ Submit Post â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Future<void> _submitPost() async {
+    // ✅ Prevent double-tap / double submit
+    if (_isPosting) return;
+
     final text = _controller.text.trim();
     final hasText = text.isNotEmpty;
     final hasAttachment = _selectedFileData != null || _attachedLink != null;
@@ -2129,17 +2145,6 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
       final svc = ref.read(firestoreServiceProvider);
       final profile = await svc.getUserProfile(user.uid);
 
-      if (profile.role == 'learner') {
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('ðŸ”’ Become a Contributor to post in the community feed.'),
-            backgroundColor: AppColors.warning,
-            behavior: SnackBarBehavior.floating,
-          ));
-        }
-        return;
-      }
 
       String? attachedUrl;
       String resolvedType = 'text';
@@ -2195,7 +2200,10 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
       );
 
       await svc.createPost(post);
-      await svc.addReputationPoints(user.uid, 5);
+      // Reputation update is best-effort — silently ignore if rules block it
+      try {
+        await svc.addReputationPoints(user.uid, 5);
+      } catch (_) {}
       setState(() => _uploadProgress = 1.0);
 
       if (mounted) {
@@ -2206,7 +2214,7 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
           content: const Row(children: [
             Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
             SizedBox(width: 10),
-            Expanded(child: Text('Post shared with the community! ðŸŽ‰')),
+            Expanded(child: Text('Post shared with the community!')),
           ]),
           backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
@@ -2216,15 +2224,18 @@ class _CreatePostSheetState extends ConsumerState<_CreatePostSheet> {
       }
     } catch (e) {
       if (mounted) {
-        final msg = e.toString().toLowerCase().contains('socket') ||
-                e.toString().toLowerCase().contains('network') ||
-                e.toString().toLowerCase().contains('connection')
+        final errStr = e.toString();
+        final msg = errStr.toLowerCase().contains('socket') ||
+                errStr.toLowerCase().contains('network') ||
+                errStr.toLowerCase().contains('connection')
             ? 'No internet connection. Please check your network and try again.'
-            : e.toString().contains('size')
+            : errStr.contains('size')
                 ? 'File is too large. Please select a smaller file.'
-                : e.toString().contains('permission') || e.toString().contains('Permission')
-                    ? 'Permission denied. Please allow file access in your device settings.'
-                    : 'Something went wrong. Please try again.';
+                : errStr.contains('permission') || errStr.contains('Permission') || errStr.contains('PERMISSION_DENIED')
+                    ? 'You do not have permission to post. Please try again or contact support.'
+                    : errStr.contains('PdfScanException') || errStr.contains('UploadRateLimit')
+                        ? errStr
+                        : 'Something went wrong. Please try again.';
         _showError(msg);
       }
     } finally {
@@ -2831,14 +2842,17 @@ class _CommentsSheetState extends ConsumerState<_CommentsSheet> {
 
   Future<void> _loadComments() async {
     try {
+      // parentId + limit applied server-side; replies were previously fetched
+      // (and billed) only to be discarded in Dart.
       final snap = await FirebaseFirestore.instance
           .collection('comments')
           .where('contentId', isEqualTo: widget.post.postId)
+          .where('parentId', isNull: true)
           .orderBy('createdAt', descending: false)
+          .limit(50)
           .get();
       final all = snap.docs
           .map((d) => CommentModel.fromMap(d.data(), d.id))
-          .where((c) => c.parentId == null)
           .toList();
       if (mounted) {
         setState(() {

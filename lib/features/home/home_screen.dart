@@ -9,6 +9,7 @@ import '../../core/constants/app_text_styles.dart';
 import '../../core/providers/app_cache_provider.dart';
 import '../../services/firestore_service.dart';
 import '../../models/user_model.dart';
+import '../../models/note_model.dart';
 import '../../models/banner_model.dart';
 import '../notes/notes_screen.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
@@ -32,13 +33,24 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with TickerProviderStateMixin {
   int _currentTab = 0;
+  // Tabs the user has actually opened. Drives the lazy IndexedStack in
+  // _buildBody so unvisited tabs never run their initState queries.
+  final Set<int> _visitedTabs = {0};
   UserModel? _userProfile;
-  int _currentBannerIndex = 0;
+  // ValueNotifier instead of setState: the carousel changes page every 4s and a
+  // setState there rebuilt the entire dashboard (which re-ran the trending
+  // notes query). Now only the dots indicator rebuilds.
+  final ValueNotifier<int> _currentBannerIndex = ValueNotifier<int>(0);
   String? _initialCourse;
   String? _initialSemester;
   String? _initialSearch;
   List<String> _recentSearches = [];
   List<BannerModel> _banners = [];
+
+  // Memoized so a rebuild does not re-issue the query. Re-created only when the
+  // course preference actually changes.
+  Future<List<NoteModel>>? _trendingNotesFuture;
+  String? _trendingNotesCourseKey;
 
   late AnimationController _heroAnimController;
   late AnimationController _cardsAnimController;
@@ -68,6 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void dispose() {
     _heroAnimController.dispose();
     _cardsAnimController.dispose();
+    _currentBannerIndex.dispose();
     super.dispose();
   }
 
@@ -121,12 +134,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Widget _buildBody() {
-    switch (_currentTab) {
+  Widget _tabAt(int index) {
+    switch (index) {
       case 0:
         return _buildHomeDashboard();
       case 1:
+        // Keyed on the deep-link params so a banner tap still re-initializes
+        // NotesScreen with the new filters (it reads them in initState only).
         return NotesScreen(
+          key: ValueKey(
+              'notes_${_initialCourse}_${_initialSemester}_$_initialSearch'),
           initialCourse: _initialCourse,
           initialSemester: _initialSemester,
           initialSearch: _initialSearch,
@@ -140,6 +157,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       default:
         return _buildHomeDashboard();
     }
+  }
+
+  Widget _buildBody() {
+    // Lazy IndexedStack: keeps each visited tab's State alive so revisiting a
+    // tab no longer destroys it and re-runs initState (which re-fetched
+    // everything from Firestore). Unvisited tabs stay unbuilt, so this does not
+    // move their queries onto app startup the way a plain IndexedStack would.
+    _visitedTabs.add(_currentTab);
+    return IndexedStack(
+      index: _currentTab,
+      children: List.generate(5, (i) {
+        if (!_visitedTabs.contains(i)) return const SizedBox.shrink();
+        return _tabAt(i);
+      }),
+    );
   }
 
   @override
@@ -1025,8 +1057,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             autoPlayCurve: Curves.fastOutSlowIn,
             viewportFraction: 0.92,
             enlargeCenterPage: true,
-            onPageChanged: (index, reason) =>
-                setState(() => _currentBannerIndex = index),
+            onPageChanged: (index, reason) => _currentBannerIndex.value = index,
           ),
           items: _banners.isNotEmpty
               ? _banners.map((banner) {
@@ -1061,23 +1092,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 }).toList(),
         ),
         const SizedBox(height: 10),
-        // Dots indicator
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_banners.isNotEmpty ? _banners.length : 5, (index) {
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: _currentBannerIndex == index ? 20.0 : 6.0,
-              height: 6.0,
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3),
-                color: _currentBannerIndex == index
-                    ? AppColors.primary
-                    : AppColors.outlineVariant,
-              ),
-            );
-          }),
+        // Dots indicator — rebuilds alone, without the rest of the dashboard.
+        ValueListenableBuilder<int>(
+          valueListenable: _currentBannerIndex,
+          builder: (context, currentIndex, _) => Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_banners.isNotEmpty ? _banners.length : 5, (index) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: currentIndex == index ? 20.0 : 6.0,
+                height: 6.0,
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  color: currentIndex == index
+                      ? AppColors.primary
+                      : AppColors.outlineVariant,
+                ),
+              );
+            }),
+          ),
         ),
       ],
     );
@@ -1086,11 +1120,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   // ─────────────────────────────────────────────────────────────────────────
   // TRENDING NOTES — Horizontal scroll
   // ─────────────────────────────────────────────────────────────────────────
+  /// Returns the cached trending-notes future, creating it only when the course
+  /// preference changes. Building the future inline in the FutureBuilder meant
+  /// every rebuild issued a fresh 50-document query.
+  Future<List<NoteModel>> _trendingNotes() {
+    final course = _userProfile?.coursePreference;
+    if (_trendingNotesFuture == null || _trendingNotesCourseKey != course) {
+      _trendingNotesCourseKey = course;
+      _trendingNotesFuture =
+          ref.read(firestoreServiceProvider).fetchNotes(course: course);
+    }
+    return _trendingNotesFuture!;
+  }
+
   Widget _buildTrendingNotesList() {
-    final firestoreService = ref.read(firestoreServiceProvider);
     return FutureBuilder(
-      future: firestoreService.fetchNotes(
-          course: _userProfile?.coursePreference),
+      future: _trendingNotes(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return ListView.builder(
