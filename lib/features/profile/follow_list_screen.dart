@@ -364,7 +364,12 @@ class _FollowListScreenState extends ConsumerState<FollowListScreen>
       MaterialPageRoute(
         builder: (_) => OtherUserProfileScreen(userId: uid),
       ),
-    ).then((_) => _loadData());
+    ).then((changed) {
+      // Only reload when the profile screen reports an actual follow/unfollow.
+      // This previously re-ran the entire followers + following + suggestions
+      // cascade every time the user backed out of a profile.
+      if (changed == true && mounted) _loadData();
+    });
   }
 
   @override

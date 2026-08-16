@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/providers/app_cache_provider.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../../services/storage_service.dart';
@@ -130,6 +131,11 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
   }
 
   Future<void> _handleUpload() async {
+    // Re-entrancy guard: two taps in the same frame both used to enter here and
+    // each ran a full Cloudinary upload of the same PDF. The duplicate check
+    // below only runs after the upload, so it stopped the second Firestore doc
+    // but not the second billed upload / stored file.
+    if (_isUploading) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -167,6 +173,27 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
         return;
       }
 
+      setState(() => _uploadStatusText = 'Checking for duplicates...');
+
+      // Duplicate check runs BEFORE the upload. It used to run after, which
+      // meant a duplicate PDF was uploaded to Cloudinary and then abandoned
+      // there with no Firestore doc pointing at it (an orphan we paid to
+      // store). The local hash matches the server-verified one for this
+      // purpose, and the authoritative hash is still used for the document.
+      final localHash = await storageService.getFileHash(_selectedFile!);
+      if (await firestoreService.checkDuplicateFile(localHash)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This PDF has already been uploaded.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+          setState(() => _isUploading = false);
+        }
+        return;
+      }
+
       setState(() => _uploadStatusText = 'Validating PDF...');
 
       // 1. Secure upload: pre-flight + server scan + Cloudinary
@@ -176,8 +203,8 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
         user.uid,
       );
 
-      // 2. Check for duplicates using the server-verified hash
-      setState(() => _uploadStatusText = 'Checking for duplicates...');
+      // 2. Re-check with the server-verified hash in case it differs from the
+      //    locally computed one.
       final isDuplicate = await firestoreService.checkDuplicateFile(fileHash);
       if (isDuplicate) {
         if (mounted) {
@@ -193,7 +220,10 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
       }
 
       // 3. Create Firestore Document
-      final profile = await firestoreService.getUserProfile(user.uid);
+      // Prefer the shared cached profile over re-reading the user document on
+      // every upload; fall back to a direct read if the cache is empty.
+      final profile = await ref.read(userProfileProvider.future) ??
+          await firestoreService.getUserProfile(user.uid);
       final String uploadStatus = profile.role == 'admin' ? 'approved' : 'pending';
 
       setState(() => _uploadStatusText = uploadStatus == 'approved'
@@ -462,7 +492,7 @@ class _UploadBottomSheetState extends ConsumerState<UploadBottomSheet> {
                 const LinearProgressIndicator(),
               ] else ...[
                 ElevatedButton.icon(
-                  onPressed: _handleUpload,
+                  onPressed: _isUploading ? null : _handleUpload,
                   icon: const Icon(Icons.cloud_upload),
                   label: const Text('Upload Content'),
                 ),

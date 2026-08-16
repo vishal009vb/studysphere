@@ -29,6 +29,13 @@ class _OtherUserProfileScreenState
   UserModel? _userProfile;
   bool _isLoading = true;
   bool _isFollowing = false;
+  // Reported back to the previous screen on pop so a follower/following list
+  // only reloads when the follow state actually changed.
+  bool _followChanged = false;
+
+  /// A uid is a 28-char Firebase Auth uid; a username is a longer, different
+  /// string. Usernames here use the '@handle' convention.
+  bool _looksLikeUid(String value) => value.length <= 40;
   int _followersCount = 0;
   int _followingCount = 0;
   List<NoteModel> _userNotes = [];
@@ -58,9 +65,15 @@ class _OtherUserProfileScreenState
     final svc = ref.read(firestoreServiceProvider);
 
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(widget.userId).get();
-      if (!doc.exists) {
-        final query = await FirebaseFirestore.instance.collection('users').where('username', isEqualTo: widget.userId).limit(1).get();
+      // Only needed to support opening a profile by username. When the route
+      // param is already a uid the listener below reads the document, so this
+      // lookup is skipped rather than reading the same doc twice.
+      if (!_looksLikeUid(widget.userId)) {
+        final query = await FirebaseFirestore.instance
+            .collection('users')
+            .where('username', isEqualTo: widget.userId)
+            .limit(1)
+            .get();
         if (query.docs.isNotEmpty) {
           resolvedUid = query.docs.first.id;
         }
@@ -97,10 +110,14 @@ class _OtherUserProfileScreenState
 
     List<PostModel> posts = [];
     try {
+      // Bounded: this fetched every post the user had ever authored. The
+      // authorId + createdAt composite index is declared in
+      // firestore.indexes.json.
       final postsSnap = await FirebaseFirestore.instance
           .collection('posts')
           .where('authorId', isEqualTo: resolvedUid)
           .orderBy('createdAt', descending: true)
+          .limit(30)
           .get();
       posts = postsSnap.docs.map((doc) => PostModel.fromMap(doc.data(), doc.id)).toList();
     } catch (e) {
@@ -110,6 +127,7 @@ class _OtherUserProfileScreenState
         final postsSnap = await FirebaseFirestore.instance
             .collection('posts')
             .where('authorId', isEqualTo: resolvedUid)
+            .limit(30)
             .get();
         final unsortedPosts = postsSnap.docs.map((doc) => PostModel.fromMap(doc.data(), doc.id)).toList();
         unsortedPosts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -152,6 +170,7 @@ class _OtherUserProfileScreenState
     setState(() {
       _isFollowing = isNowFollowing;
       _followersCount += isNowFollowing ? 1 : -1;
+      _followChanged = true;
     });
 
     try {
@@ -160,7 +179,7 @@ class _OtherUserProfileScreenState
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Following ${_userProfile!.name} ✨'),
+              content: Text('Now following ${_userProfile!.name}'),
               backgroundColor: AppColors.success,
               behavior: SnackBarBehavior.floating,
             ),
@@ -192,7 +211,10 @@ class _OtherUserProfileScreenState
   @override
   Widget build(BuildContext context) {
     final currentUid = ref.read(authServiceProvider).currentUser?.uid;
-    final isSelf = currentUid == widget.userId;
+    // Compare against resolvedUid, not widget.userId: when the screen is opened
+    // by username these differ, so your own profile showed a Follow button and
+    // tapping it wrote a self-follow edge plus two counter increments.
+    final isSelf = currentUid == resolvedUid;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -201,7 +223,7 @@ class _OtherUserProfileScreenState
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, _followChanged),
         ),
         title: Text(
           _userProfile?.name ?? 'Student Profile',
@@ -218,12 +240,13 @@ class _OtherUserProfileScreenState
                     SliverToBoxAdapter(
                       child: Container(
                         color: Colors.white,
-                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            // ── Avatar & Info ──
+                            // ── Avatar ──
                             CircleAvatar(
-                              radius: 44,
+                              radius: 42,
                               backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                               backgroundImage: _userProfile!.photoUrl.isNotEmpty
                                   ? NetworkImage(_userProfile!.photoUrl)
@@ -235,104 +258,131 @@ class _OtherUserProfileScreenState
                                           : '?',
                                       style: const TextStyle(
                                         color: AppColors.primary,
-                                        fontSize: 32,
+                                        fontSize: 30,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     )
                                   : null,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 10),
 
+                            // ── Display Name ──
                             Text(
                               _userProfile!.name,
-                              style: AppTextStyles.headingMedium.copyWith(fontSize: 22),
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.headingMedium.copyWith(fontSize: 20),
                             ),
-                            const SizedBox(height: 4),
 
-                            if (_userProfile!.coursePreference.isNotEmpty)
+                            // ── Course & Semester ──
+                            if (_userProfile!.coursePreference.isNotEmpty) ...[
+                              const SizedBox(height: 3),
                               Text(
                                 '${_userProfile!.coursePreference} · Semester ${_userProfile!.semester}',
+                                textAlign: TextAlign.center,
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.textSecondary,
+                                  fontSize: 13,
                                 ),
                               ),
-                            const SizedBox(height: 16),
+                            ],
 
-                            // ── Follow Button (if not self) ──
-                            if (!isSelf)
+                            // ── Follow Button (only when not self) ──
+                            if (!isSelf) ...[
+                              const SizedBox(height: 12),
                               SizedBox(
                                 width: 160,
-                                height: 40,
+                                height: 44,
                                 child: ElevatedButton.icon(
                                   onPressed: _toggleFollow,
                                   icon: Icon(
                                     _isFollowing
                                         ? Icons.check_rounded
                                         : Icons.person_add_rounded,
-                                    size: 18,
-                                    color: _isFollowing ? AppColors.textPrimary : Colors.white,
+                                    size: 17,
+                                    color: _isFollowing
+                                        ? AppColors.primary
+                                        : Colors.white,
                                   ),
                                   label: Text(
                                     _isFollowing ? 'Following' : 'Follow',
                                     style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: _isFollowing ? AppColors.textPrimary : Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      color: _isFollowing
+                                          ? AppColors.primary
+                                          : Colors.white,
                                     ),
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isFollowing
                                         ? const Color(0xFFF3F2FF)
                                         : AppColors.primary,
-                                    elevation: _isFollowing ? 0 : 2,
+                                    elevation: _isFollowing ? 0 : 3,
+                                    shadowColor: AppColors.primary.withValues(alpha: 0.3),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.circular(22),
                                       side: _isFollowing
                                           ? const BorderSide(color: AppColors.border)
                                           : BorderSide.none,
                                     ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
                                   ),
                                 ),
                               ),
-                            const SizedBox(height: 20),
+                            ],
 
-                            // ── Stats Cards ──
+                            const SizedBox(height: 16),
+
+                            // ── Stats Cards — fluid width, no overflow ──
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _buildStatCard('${_userNotes.length}', 'Notes'),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => FollowListScreen(
-                                          userId: _userProfile!.uid,
-                                          initialTab: 0,
-                                          userName: _userProfile!.name,
+                                Expanded(child: _buildStatCard('${_userNotes.length}', 'Notes')),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => FollowListScreen(
+                                            userId: _userProfile!.uid,
+                                            initialTab: 0,
+                                            userName: _userProfile!.name,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                  child: _buildStatCard('$_followersCount', 'Followers'),
+                                      );
+                                    },
+                                    child: _buildStatCard('$_followersCount', 'Followers'),
+                                  ),
                                 ),
-                                GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => FollowListScreen(
-                                          userId: _userProfile!.uid,
-                                          initialTab: 1,
-                                          userName: _userProfile!.name,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => FollowListScreen(
+                                            userId: _userProfile!.uid,
+                                            initialTab: 1,
+                                            userName: _userProfile!.name,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                  child: _buildStatCard('$_followingCount', 'Following'),
+                                      );
+                                    },
+                                    child: _buildStatCard('$_followingCount', 'Following'),
+                                  ),
                                 ),
-                                _buildStatCard(
-                                  '#${_userProfile!.reputationPoints > 0 ? 3 : "-"}',
-                                  'Rank',
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _buildStatCard(
+                                    _userProfile!.contributorRank.isNotEmpty
+                                        ? _userProfile!.contributorRank
+                                            .replaceAll(' Contributor', '')
+                                            .replaceAll(' Educator', '')
+                                        : 'New',
+                                    'Rank',
+                                  ),
                                 ),
                               ],
                             ),
@@ -372,8 +422,7 @@ class _OtherUserProfileScreenState
 
   Widget _buildStatCard(String value, String label) {
     return Container(
-      width: 76,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -383,14 +432,19 @@ class _OtherUserProfileScreenState
         children: [
           Text(
             value,
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
             style: AppTextStyles.headingSmall.copyWith(
               color: AppColors.primary,
-              fontSize: 18,
+              fontSize: value.length > 4 ? 13 : 18,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
+            textAlign: TextAlign.center,
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.textSecondary,
               fontSize: 11,

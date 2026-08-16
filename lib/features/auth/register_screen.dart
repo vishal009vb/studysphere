@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
@@ -35,6 +36,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _isCheckingUsername = false;
   bool? _usernameAvailable;
   Timer? _usernameDebounce;
+
+  // Gesture recognizers for clickable Terms & Privacy links
+  final TapGestureRecognizer _termsRecognizer = TapGestureRecognizer();
+  final TapGestureRecognizer _privacyRecognizer = TapGestureRecognizer();
 
   String? _selectedState;
   String? _selectedDistrict;
@@ -140,7 +145,45 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _collegeDisplayController.dispose();
     _debounce?.cancel();
     _usernameDebounce?.cancel();
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
     super.dispose();
+  }
+
+  Widget _buildUsernameStatusChip({
+    required Key key,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color bgColor,
+    required Color borderColor,
+  }) {
+    return Container(
+      key: key,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: borderColor, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleRegister() async {
@@ -335,47 +378,115 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               const SizedBox(height: 16),
 
                               // Username field with live availability check
-                              TextFormField(
-                                controller: _usernameController,
-                                onChanged: _onUsernameChanged,
-                                decoration: InputDecoration(
-                                  labelText: 'Username',
-                                  hintText: 'e.g. vishal_123',
-                                  prefixIcon: const Icon(Icons.alternate_email_rounded),
-                                  suffixIcon: _isCheckingUsername
-                                      ? const Padding(
-                                          padding: EdgeInsets.all(12),
-                                          child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                                        )
-                                      : _usernameAvailable == null
-                                          ? null
-                                          : Icon(
-                                              _usernameAvailable! ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                              color: _usernameAvailable! ? Colors.green : Colors.red,
-                                            ),
-                                  helperText: _usernameAvailable == null
-                                      ? 'Lowercase letters, numbers, _ and . only'
-                                      : _usernameAvailable!
-                                          ? '✓ Username is available'
-                                          : '✗ Username already taken',
-                                  helperStyle: TextStyle(
-                                    color: _usernameAvailable == null
-                                        ? Colors.grey
-                                        : _usernameAvailable!
-                                            ? Colors.green
-                                            : Colors.red,
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextFormField(
+                                    controller: _usernameController,
+                                    onChanged: _onUsernameChanged,
+                                    decoration: InputDecoration(
+                                      labelText: 'Username',
+                                      hintText: 'e.g. vishal_123',
+                                      prefixIcon: const Icon(Icons.alternate_email_rounded),
+                                      suffixIcon: _isCheckingUsername
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(12),
+                                              child: SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                              ),
+                                            )
+                                          : _usernameAvailable == null
+                                              ? null
+                                              : Icon(
+                                                  _usernameAvailable! ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                                  color: _usernameAvailable! ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+                                                  size: 24,
+                                                ),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _usernameAvailable == null
+                                              ? Colors.grey.shade400
+                                              : _usernameAvailable!
+                                                  ? const Color(0xFF22C55E)
+                                                  : const Color(0xFFEF4444),
+                                          width: _usernameAvailable != null ? 2 : 1,
+                                        ),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: _usernameAvailable == null
+                                              ? AppColors.primary
+                                              : _usernameAvailable!
+                                                  ? const Color(0xFF22C55E)
+                                                  : const Color(0xFFEF4444),
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.trim().isEmpty) return 'Username is required';
+                                      if (value.trim().length < 3) return 'At least 3 characters required';
+                                      final regex = RegExp(r'^[a-z0-9_.]+$');
+                                      if (!regex.hasMatch(value.trim().toLowerCase())) return 'Lowercase letters, numbers, _ and . only';
+                                      if (_usernameAvailable == false) return 'Username already taken';
+                                      return null;
+                                    },
                                   ),
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) return 'Username is required';
-                                  if (value.trim().length < 3) return 'At least 3 characters required';
-                                  final regex = RegExp(r'^[a-z0-9_.]+$');
-                                  if (!regex.hasMatch(value.trim().toLowerCase())) return 'Lowercase letters, numbers, _ and . only';
-                                  if (_usernameAvailable == false) return 'Username already taken';
-                                  return null;
-                                },
+                                  const SizedBox(height: 8),
+                                  // --- Live availability status badge ---
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 300),
+                                    transitionBuilder: (child, animation) => FadeTransition(
+                                      opacity: animation,
+                                      child: SlideTransition(
+                                        position: Tween<Offset>(begin: const Offset(0, -0.3), end: Offset.zero).animate(animation),
+                                        child: child,
+                                      ),
+                                    ),
+                                    child: _isCheckingUsername
+                                        ? _buildUsernameStatusChip(
+                                            key: const ValueKey('checking'),
+                                            icon: Icons.hourglass_top_rounded,
+                                            label: 'Checking availability...',
+                                            color: Colors.orange.shade600,
+                                            bgColor: Colors.orange.shade50,
+                                            borderColor: Colors.orange.shade200,
+                                          )
+                                        : _usernameAvailable == null
+                                            ? _buildUsernameStatusChip(
+                                                key: const ValueKey('hint'),
+                                                icon: Icons.info_outline_rounded,
+                                                label: 'Lowercase letters, numbers, _ and . only',
+                                                color: Colors.grey.shade600,
+                                                bgColor: Colors.grey.shade50,
+                                                borderColor: Colors.grey.shade200,
+                                              )
+                                            : _usernameAvailable!
+                                                ? _buildUsernameStatusChip(
+                                                    key: const ValueKey('available'),
+                                                    icon: Icons.check_circle_rounded,
+                                                    label: 'Username is available! 🎉',
+                                                    color: const Color(0xFF16A34A),
+                                                    bgColor: const Color(0xFFF0FDF4),
+                                                    borderColor: const Color(0xFF86EFAC),
+                                                  )
+                                                : _buildUsernameStatusChip(
+                                                    key: const ValueKey('taken'),
+                                                    icon: Icons.cancel_rounded,
+                                                    label: 'Username already taken. Try another.',
+                                                    color: const Color(0xFFDC2626),
+                                                    bgColor: const Color(0xFFFFF1F2),
+                                                    borderColor: const Color(0xFFFCA5A5),
+                                                  ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 16),
+
 
                               // Email
                               TextFormField(
@@ -445,24 +556,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                         padding: const EdgeInsets.only(top: 10.0),
                                         child: RichText(
                                           text: TextSpan(
-                                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.4),
-                                            children: const [
-                                              TextSpan(text: 'I agree to the '),
+                                            style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700, height: 1.5),
+                                            children: [
+                                              const TextSpan(text: 'I agree to the '),
                                               TextSpan(
                                                 text: 'Terms & Conditions',
-                                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                                style: const TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                  decoration: TextDecoration.underline,
+                                                  decorationColor: AppColors.primary,
+                                                ),
+                                                recognizer: _termsRecognizer
+                                                  ..onTap = () => context.push('/terms'),
                                               ),
-                                              TextSpan(text: ' and '),
+                                              const TextSpan(text: ' and '),
                                               TextSpan(
                                                 text: 'Privacy Policy',
-                                                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                                style: const TextStyle(
+                                                  color: AppColors.primary,
+                                                  fontWeight: FontWeight.bold,
+                                                  decoration: TextDecoration.underline,
+                                                  decorationColor: AppColors.primary,
+                                                ),
+                                                recognizer: _privacyRecognizer
+                                                  ..onTap = () => context.push('/privacy'),
                                               ),
-                                              TextSpan(text: '. My data is processed as per the '),
-                                              TextSpan(
-                                                text: 'Digital Personal Data Protection Act, 2023 (India)',
-                                                style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87),
-                                              ),
-                                              TextSpan(text: '.'),
+                                              const TextSpan(text: '.'),
                                             ],
                                           ),
                                         ),
@@ -475,16 +595,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                               // Next button
                               ElevatedButton(
-                                onPressed: () {
+                                onPressed: _isCheckingUsername ? null : () async {
                                   setState(() => _autoValidate = true);
+                                  final messenger = ScaffoldMessenger.of(context);
                                   if (!_termsAccepted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Please accept Terms & Conditions')),
                                     );
                                     return;
                                   }
+                                  // If username not yet checked (user typed but debounce not fired), check now
+                                  final username = _usernameController.text.trim().toLowerCase();
+                                  if (_usernameAvailable == null && username.length >= 3) {
+                                    setState(() => _isCheckingUsername = true);
+                                    try {
+                                      final available = await ref.read(firestoreServiceProvider).isUsernameAvailable(username);
+                                      if (mounted) {
+                                        setState(() { _usernameAvailable = available; _isCheckingUsername = false; });
+                                      }
+                                      if (!available) {
+                                        messenger.showSnackBar(
+                                          const SnackBar(content: Text('Username already taken. Please choose another.'), backgroundColor: Colors.red),
+                                        );
+                                        return;
+                                      }
+                                    } catch (_) {
+                                      if (mounted) setState(() { _isCheckingUsername = false; });
+                                    }
+                                  }
                                   if (_usernameAvailable == false) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
+                                    messenger.showSnackBar(
                                       const SnackBar(content: Text('Please choose a different username')),
                                     );
                                     return;

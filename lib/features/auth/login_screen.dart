@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../services/auth_service.dart';
+import '../../services/firestore_service.dart';
 import '../../core/utils/app_error_formatter.dart';
 import '../../core/widgets/animated_transition.dart';
 
@@ -93,7 +94,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
       final authService = ref.read(authServiceProvider);
       final credential = await authService.signInWithGoogle();
       if (credential != null && mounted) {
-        context.go('/home');
+        // Check if this is a new Google user who needs to complete their profile
+        final user = credential.user;
+        if (user != null) {
+          final firestoreService = ref.read(firestoreServiceProvider);
+          bool needsSetup = false;
+          try {
+            final userProfile = await firestoreService.getUserProfile(user.uid);
+            // Profile exists - check if username is set
+            needsSetup = userProfile.username.isEmpty;
+          } catch (_) {
+            // Profile doesn't exist yet - needs setup
+            needsSetup = true;
+          }
+          if (needsSetup && mounted) {
+            context.go('/google-profile-setup');
+            return;
+          }
+        }
+        if (mounted) context.go('/home');
       }
     } catch (e) {
       if (mounted) {

@@ -125,7 +125,7 @@ class TermsConditionsScreen extends StatelessWidget {
               icon: Icons.description_rounded,
               title: 'Terms & Conditions',
               subtitle: 'Please read these terms carefully before using StudySphere.',
-              lastUpdated: 'Last updated: July 20, 2026',
+              lastUpdated: 'Last updated: August 7, 2026',
               color: Colors.indigo,
             ),
             Padding(
@@ -136,72 +136,87 @@ class TermsConditionsScreen extends StatelessWidget {
                   LegalSection(
                     title: '1. Acceptance of Terms',
                     content:
-                        'By downloading, installing, or using StudySphere, you agree to be bound by these Terms and Conditions and our Privacy Policy. If you do not agree with any part of these terms, you must not use our services.\n\nThese Terms constitute a legally binding agreement between you and StudySphere.',
+                        'By registering, downloading, or using StudySphere ("the App"), you agree to be legally bound by these Terms and Conditions ("Terms") and our Privacy Policy.\n\nIf you do not agree with any part of these Terms, you must immediately stop using StudySphere. Continued use of the App after any changes to these Terms constitutes your acceptance of the updated Terms.\n\nStudySphere is operated by an independent developer team based in India and is intended for students enrolled in higher education institutions.',
                   ),
                   LegalSection(
-                    title: '2. User Responsibilities',
+                    title: '2. Eligibility & Account Registration',
                     content:
-                        'You agree to:\n• Provide accurate registration information\n• Keep your login credentials secure\n• Not share your account with others\n• Notify us immediately of any unauthorized account access\n• Use StudySphere only for lawful educational purposes\n• Comply with all applicable laws and regulations',
+                        'To use StudySphere, you must:\n• Be at least 13 years of age\n• Be a student or associated with an educational institution\n• Provide accurate and complete information during registration\n• Have a valid email address or Google account\n\nUsername Rules:\n• Your username must be unique and not already taken\n• Usernames must contain only lowercase letters (a–z), numbers (0–9), underscores (_), and dots (.)\n• Usernames must be at least 3 characters long\n• Usernames cannot impersonate other users, public figures, or brands\n• Usernames cannot contain offensive or inappropriate words\n• Once chosen, usernames cannot be changed frequently — choose wisely\n\nYou are responsible for keeping your account credentials (password, etc.) secure. Do not share your account with others.',
                   ),
                   LegalSection(
-                    title: '3. Educational Purpose',
+                    title: '3. What StudySphere Offers',
                     content:
-                        'StudySphere is an educational platform designed to help students access study materials, collaborate, and enhance their learning experience. All features must be used for genuine educational purposes. Commercial use of our platform or its content without written permission is strictly prohibited.',
+                        'StudySphere is a student-centric educational platform that provides:\n\n📚 Notes & Study Materials\nAccess notes, PDFs, and study resources uploaded by students from your college and across India.\n\n📄 Question Papers\nDownload previous year question papers to prepare for exams.\n\n🤖 AI Assistant\nGet academic help powered by Google Gemini AI. Ask questions, summarize notes, and get explanations.\n\n🏘️ Community Feed\nPost questions, share updates, interact with fellow students, and build your academic network.\n\n🏆 Reputation Points\nEarn reputation points by uploading quality content, getting likes and saves, and contributing to the community.\n\n🔔 Notifications\nReceive alerts about community activity, new notes, and important app updates.',
                   ),
                   LegalSection(
-                    title: '4. Community Rules',
+                    title: '4. Account Rules & User Responsibilities',
                     content:
-                        'When participating in the StudySphere community:\n• Treat all users with respect and dignity\n• Do not post offensive, hateful, or discriminatory content\n• Do not harass, bully, or threaten other users\n• Do not spread misinformation or fake information\n• Do not spam or post repetitive content\n• Do not share personal information of others without consent',
+                        'As a StudySphere user, you agree to:\n\n✅ You MUST:\n• Use the app only for genuine educational purposes\n• Provide accurate information in your profile\n• Respect other users and their content\n• Report any content that violates these terms\n• Keep your login credentials secure\n• Notify us immediately if your account is compromised\n\n❌ You MUST NOT:\n• Create multiple accounts for the same person\n• Share your account credentials with anyone\n• Use the app for commercial purposes without written permission\n• Attempt to hack, reverse-engineer, or disrupt the app\n• Use bots, scrapers, or automated tools to access the app\n• Impersonate StudySphere staff, teachers, or other users\n• Violate any applicable laws of India or your country',
                   ),
                   LegalSection(
-                    title: '5. Upload Rules',
+                    title: '5. Notes & Content Upload Rules',
                     content:
-                        'By uploading content to StudySphere, you confirm that:\n• You own the content or have permission to share it\n• The content is educational and relevant to academic study\n• The content does not violate any copyright or intellectual property rights\n• The content does not contain malware, adult material, or illegal content\n\nWe reserve the right to remove any content that violates these rules without notice.',
+                        'StudySphere allows students to upload notes and study materials. By uploading content, you confirm that:\n\n• You are the original creator of the content OR you have explicit permission to share it\n• The content is educational and relevant to academic subjects\n• The content does not infringe any copyright, trademark, or intellectual property rights\n• The content does not contain personal information of any individual without consent\n• The content does not include adult/explicit material, hate speech, or illegal information\n• The content is not malware, spam, or advertising material\n\nContent that gets removed:\nWe may remove any uploaded content without prior notice if it violates these rules. Repeated violations will result in account suspension.\n\nReputation Points for Uploads:\nWhen you upload notes that are liked or saved by other users, you earn reputation points. If your content is removed for violations, reputation points may be deducted.',
                   ),
                   LegalSection(
-                    title: '6. AI Usage Policy',
+                    title: '6. Community Feed Rules',
                     content:
-                        'The StudySphere AI Assistant is powered by Google Gemini and is subject to the following:\n• Daily usage limits apply to free-tier users\n• Attempts to bypass rate limits will result in account suspension\n• Do not use the AI for plagiarism, cheating in examinations, or generating harmful content\n• AI responses are for educational assistance only and should be verified independently\n• Do not share sensitive personal information with the AI Assistant',
+                        'The StudySphere Community Feed is a space for academic discussion and peer support. The following rules apply:\n\n✅ Allowed:\n• Academic questions and discussions\n• Sharing helpful resources and links\n• Constructive feedback on other users\' posts\n• Encouragement and motivational posts for students\n• Announcements about exams, results, or college events\n\n❌ Not Allowed:\n• Bullying, harassment, or threatening any user\n• Posting offensive, hateful, racist, or discriminatory content\n• Spreading fake news, misinformation, or rumors\n• Spamming — repetitive posts or irrelevant content\n• Sharing another person\'s personal information without consent\n• Promoting political parties, religions, or divisive content\n• Posting illegal content of any kind\n\nViolations may result in post removal, temporary suspension, or permanent ban depending on severity.',
                   ),
                   LegalSection(
-                    title: '7. Account Suspension & Termination',
+                    title: '7. AI Assistant — Usage Policy',
                     content:
-                        'We may suspend or terminate your account without prior notice if you:\n• Violate these Terms and Conditions\n• Upload infringing or prohibited content\n• Abuse platform features or other users\n• Attempt to hack or disrupt the service\n\nYou may appeal a suspension by contacting us at vishalbhoi475@gmail.com.',
+                        'The StudySphere AI Assistant is powered by Google Gemini. By using the AI Assistant, you agree to:\n\n• Use it only for legitimate academic assistance (understanding concepts, summarizing notes, solving problems)\n• Not use it to generate content for plagiarism or academic dishonesty\n• Not attempt to bypass daily usage limits or rate limits\n• Not enter sensitive personal information (Aadhaar, bank details, passwords, etc.)\n• Not use it to generate harmful, offensive, or illegal content\n• Understand that AI responses may not always be 100% accurate — verify important information independently\n\nDaily Usage Limits:\nFree-tier users have a daily limit on AI queries. Attempting to bypass these limits will result in temporary or permanent account suspension.\n\nData Note:\nAI conversations are processed via Google Gemini APIs. We do not permanently store raw AI chat messages beyond your session.',
                   ),
                   LegalSection(
-                    title: '8. Intellectual Property',
+                    title: '8. Reputation Points System',
                     content:
-                        'All StudySphere branding, logos, app design, and original content created by our team are protected by intellectual property laws. You retain ownership of content you upload but grant StudySphere a non-exclusive, worldwide, royalty-free license to host, display, and distribute it within the platform.',
+                        'StudySphere uses a Reputation Points system to reward quality contributions:\n\nHow you earn points:\n• Uploading notes that receive likes ➜ +points per like\n• Your uploaded notes being saved by others ➜ +points per save\n• Community posts receiving engagement ➜ +points\n• Consistent high-quality contributions ➜ bonus points\n\nHow you can lose points:\n• Your uploaded content being removed for violations ➜ -points\n• Accounts found to be manipulating points through fake activity will have points reset\n\nReputation points do not have any monetary value. They are for recognition and community standing only. StudySphere reserves the right to adjust the points system at any time.',
                   ),
                   LegalSection(
-                    title: '9. Copyright Policy',
+                    title: '9. Account Suspension & Termination',
                     content:
-                        'StudySphere respects intellectual property rights. If you believe any content on our platform infringes your copyright, please contact us at vishalbhoi475@gmail.com with:\n• Description of the copyrighted work\n• URL or location of the infringing content\n• Your contact information\n\nWe will review and remove infringing content within 7 business days.',
+                        'We may suspend or permanently ban your account if you:\n• Violate any section of these Terms\n• Upload copyright-infringing or prohibited content\n• Harass, bully, or threaten other users\n• Attempt to hack or disrupt the app or its servers\n• Create multiple accounts\n• Manipulate the reputation points system\n\nSuspension types:\n• Temporary Suspension: 24 hours to 30 days depending on violation severity\n• Permanent Ban: For serious or repeated violations\n\nYou may appeal a suspension by contacting us at vishalbhoi475@gmail.com within 7 days. We will review your appeal and respond within 5 business days.',
                   ),
                   LegalSection(
-                    title: '10. Limitation of Liability',
+                    title: '10. Intellectual Property',
                     content:
-                        'StudySphere provides services "as is" without warranties of any kind. We do not guarantee:\n• The accuracy of community-uploaded notes or AI-generated content\n• Uninterrupted or error-free service\n• Security of data beyond commercially reasonable standards\n\nTo the maximum extent permitted by law, StudySphere shall not be liable for any indirect, incidental, or consequential damages arising from your use of our services.',
+                        'StudySphere\'s branding, logo, app design, interface, and original platform content are protected under Indian intellectual property laws.\n\nYour content: You retain ownership of notes and content you upload. However, by uploading, you grant StudySphere a non-exclusive, royalty-free, worldwide license to host, display, distribute, and make your content available to other users within the platform.\n\nOther users\' content: You may view and download content for personal academic use only. You may not redistribute, sell, or republish others\' content without their permission.',
                   ),
                   LegalSection(
-                    title: '11. No Warranty',
+                    title: '11. Copyright & DMCA Policy',
                     content:
-                        'All content on StudySphere is provided for educational purposes only. We make no representations or warranties about the completeness, accuracy, or suitability of any study materials. Always cross-reference important educational content with official academic sources.',
+                        'StudySphere respects intellectual property rights and expects users to do the same.\n\nIf you believe content on our platform infringes your copyright, please send a takedown notice to vishalbhoi475@gmail.com with:\n• Your name and contact information\n• A description of the copyrighted work\n• The location (URL/title) of the infringing content in the app\n• A statement that you have a good-faith belief the use is unauthorized\n• Your electronic signature\n\nWe will review and remove infringing content within 7 business days.',
                   ),
                   LegalSection(
-                    title: '12. Governing Law',
+                    title: '12. Privacy & Data Collection',
                     content:
-                        'These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising from these Terms shall be subject to the exclusive jurisdiction of the courts in India.',
+                        'By using StudySphere, you consent to the collection and use of your data as described in our Privacy Policy.\n\nWe collect:\n• Account information (name, email, username, profile photo)\n• Educational details (college, state, district)\n• Content you upload (notes, posts, comments)\n• Usage analytics (anonymized, for app improvement)\n\nWe do NOT:\n• Sell your personal data to third parties\n• Use your data for targeted advertising\n• Store AI chat messages permanently\n\nFor full details, please read our Privacy Policy.',
                   ),
                   LegalSection(
-                    title: '13. Termination',
+                    title: '13. Digital Personal Data Protection Act, 2023 (India)',
                     content:
-                        'Either party may terminate this agreement at any time. You may terminate by deleting your account. We may terminate by suspending your access to StudySphere. Upon termination, your right to use the service ceases immediately.',
+                        'StudySphere is fully compliant with the Digital Personal Data Protection Act, 2023 (DPDP Act) enacted by the Government of India.\n\nYour rights under the DPDP Act:\n✅ Right to Access: You can request to know what personal data we hold about you.\n✅ Right to Correction: You can request correction of inaccurate personal data.\n✅ Right to Erasure: You can request deletion of your personal data at any time.\n✅ Right to Grievance Redressal: You can file a complaint with us within 30 days of any data-related concern.\n✅ Right to Withdraw Consent: You may withdraw your consent at any time. Withdrawal of consent may limit your ability to use certain features.\n✅ Right to Nominate: You may nominate another individual to exercise your rights in case of incapacity.\n\nOur obligations:\n• We collect your personal data only with your free, informed, and specific consent\n• We use your data only for the purpose it was collected\n• We implement appropriate security measures to protect your data\n• We do not retain your data beyond what is necessary\n• We notify you in case of any data breach that may affect your rights\n\nData Fiduciary:\nStudySphere acts as the Data Fiduciary responsible for processing your personal data.\n\nGrievance Officer:\nFor any DPDP Act-related concerns, contact: vishalbhoi475@gmail.com\nWe will respond within 30 days as mandated by law.',
                   ),
                   LegalSection(
-                    title: '14. Contact Information',
+                    title: '14. Limitation of Liability',
                     content:
-                        'For any questions regarding these Terms and Conditions:\n\nEmail: vishalbhoi475@gmail.com\nApp: Profile → Contact Support',
+                        'StudySphere is provided "as is" without any warranties, express or implied. We do not guarantee:\n• Uninterrupted or error-free operation of the app\n• The accuracy of user-uploaded notes or AI-generated responses\n• That the app will be available at all times\n\nTo the maximum extent permitted by Indian law, StudySphere shall not be liable for:\n• Any loss of data\n• Indirect, incidental, or consequential damages\n• Damages arising from reliance on AI-generated content\n• Actions of other users on the platform\n\nAlways verify important academic information from official sources.',
+                  ),
+                  LegalSection(
+                    title: '15. Changes to These Terms',
+                    content:
+                        'We may update these Terms from time to time. When we make significant changes:\n• We will notify you via in-app notification or email\n• The updated Terms will be published in the app with the new effective date\n• Continued use of the app after the effective date means you accept the updated Terms\n\nWe encourage you to review these Terms periodically.',
+                  ),
+                  LegalSection(
+                    title: '16. Governing Law & Disputes',
+                    content:
+                        'These Terms shall be governed by the laws of India. Any disputes arising out of or in connection with these Terms shall be subject to the exclusive jurisdiction of the courts in India.\n\nBefore approaching courts, we encourage you to contact us first at vishalbhoi475@gmail.com to resolve any disputes amicably.',
+                  ),
+                  LegalSection(
+                    title: '17. Contact Us',
+                    content:
+                        'For any questions, concerns, or feedback regarding these Terms and Conditions:\n\n📧 Email: vishalbhoi475@gmail.com\n📱 In-App: Profile → Contact Support\n\nWe aim to respond to all queries within 3 business days.',
                   ),
                   SizedBox(height: 16),
                 ],
@@ -213,3 +228,4 @@ class TermsConditionsScreen extends StatelessWidget {
     );
   }
 }
+

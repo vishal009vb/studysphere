@@ -85,12 +85,16 @@ class _NoteDetailScreenState extends ConsumerState<NoteDetailScreen> {
       // Safely load top-level comments
       List<CommentModel> comments = [];
       try {
+        // parentId + limit are applied server-side. This used to fetch every
+        // comment including replies, then discard the replies client-side —
+        // paying reads for documents that were never displayed.
         final commentsSnap = await db
             .collection('comments')
             .where('contentId', isEqualTo: widget.noteId)
+            .where('parentId', isNull: true)
+            .limit(30)
             .get();
         comments = commentsSnap.docs
-            .where((doc) => doc.data()['parentId'] == null)
             .map((doc) => CommentModel.fromMap(doc.data(), doc.id))
             .toList();
       } catch (_) {}

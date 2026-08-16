@@ -5,7 +5,18 @@ Future<void> fixAllPlaylists() async {
   debugPrint('fixAllPlaylists executed.');
 }
 
-Future<void> seedUserProvidedCourses() async {
+/// Seeds the built-in course catalogue.
+///
+/// This is a development/admin maintenance tool and is deliberately NOT called
+/// during app startup. Release builds no-op unless [force] is set, so a normal
+/// user launch can never delete, overwrite, or re-seed the `courses`
+/// collection. Pass `force: true` only from an explicit admin action.
+Future<void> seedUserProvidedCourses({bool force = false}) async {
+  if (!kDebugMode && !force) {
+    debugPrint('Course seeding skipped: release build without force flag.');
+    return;
+  }
+
   final db = FirebaseFirestore.instance;
 
   final courses = [
@@ -324,15 +335,12 @@ Future<void> seedUserProvidedCourses() async {
   ];
 
   try {
-    final snapshot = await db.collection('courses').get();
-    
-    // Clear old/duplicate documents so only clean user courses exist
-    for (var doc in snapshot.docs) {
-      await doc.reference.delete();
-    }
-    debugPrint('Cleared old courses from Firestore.');
+    // Upsert only. The previous implementation deleted every document in the
+    // collection first, which destroyed admin-created courses, wiped the
+    // isVisible/isDeleted/isPaid moderation flags, and reset createdAt on
+    // every run.
+    final batch = db.batch();
 
-    // Add clean 10 user courses with actual YouTube thumbnails
     for (final course in courses) {
       final docId = course['id'] as String;
       final data = {
@@ -346,15 +354,17 @@ Future<void> seedUserProvidedCourses() async {
         'channelName': course['channelName'],
         'isFeatured': course['isFeatured'],
         'order': course['order'],
-        'createdAt': FieldValue.serverTimestamp(),
         'modules': course['modules'],
         'totalVideos': (course['modules'] as List).length,
       };
 
-      await db.collection('courses').doc(docId).set(data);
-      debugPrint('Seeded course: ${course['title']} ($docId)');
+      // merge:true preserves moderation flags and the original createdAt.
+      batch.set(db.collection('courses').doc(docId), data, SetOptions(merge: true));
     }
-    debugPrint('SUCCESS: All 10 user courses seeded cleanly with real YouTube thumbnails!');
+
+    // One commit instead of 10 sequential round-trips.
+    await batch.commit();
+    debugPrint('SUCCESS: ${courses.length} courses upserted (merge, non-destructive).');
   } catch (e) {
     debugPrint('Error seeding courses: $e');
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -19,6 +21,17 @@ class NotificationService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   GoRouter? _router;
 
+  // Guards against re-initialising. initialize() is triggered from a post-frame
+  // callback, so without this every rebuild would re-register the FCM listeners
+  // (duplicate handling of a single notification tap) and re-write the token.
+  bool _initialized = false;
+
+  // Last token written to Firestore this session, so an unchanged token does
+  // not cost a write on every launch.
+  String? _lastSyncedToken;
+
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+
   NotificationService();
 
   void attachRouter(GoRouter router) {
@@ -26,6 +39,8 @@ class NotificationService {
   }
 
   Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
     try {
       // 1. Request Permission for status bar / lock screen notifications
       NotificationSettings settings = await _messaging.requestPermission(
@@ -58,26 +73,39 @@ class NotificationService {
         }
 
         // 5. Handle notification tap when app was in BACKGROUND
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-          debugPrint('Notification tapped in background: ${message.data}');
-          _handleNotificationTap(message);
-        });
+        _subscriptions.add(
+          FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+            debugPrint('Notification tapped in background: ${message.data}');
+            _handleNotificationTap(message);
+          }),
+        );
 
         // 6. Handle FOREGROUND notifications
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-          debugPrint('FCM Foreground message received: ${message.data}');
-        });
+        _subscriptions.add(
+          FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+            debugPrint('FCM Foreground message received: ${message.data}');
+          }),
+        );
 
         // 7. Save & sync FCM Token to Firestore
         try {
           final token = await _messaging.getToken();
           await _saveTokenToDatabase(token);
+
+          // On a cold start auth restoration often has not finished yet, so the
+          // write above is skipped (no uid). Retry once auth resolves rather
+          // than losing the token until the next launch.
+          _subscriptions.add(
+            FirebaseAuth.instance.authStateChanges().listen((user) {
+              if (user != null) _saveTokenToDatabase(token);
+            }),
+          );
         } catch (e) {
           debugPrint('Could not fetch FCM token: $e');
         }
 
         // 8. Sync Token Refreshes
-        _messaging.onTokenRefresh.listen(_saveTokenToDatabase);
+        _subscriptions.add(_messaging.onTokenRefresh.listen(_saveTokenToDatabase));
       }
     } catch (e) {
       debugPrint('FCM Notification initialization error: $e');
@@ -91,10 +119,22 @@ class NotificationService {
     }
   }
 
+  Future<void> dispose() async {
+    for (final sub in _subscriptions) {
+      await sub.cancel();
+    }
+    _subscriptions.clear();
+    _initialized = false;
+  }
+
   Future<void> _saveTokenToDatabase(String? token) async {
     if (token == null) return;
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+
+    // Skip the write when nothing changed — this ran unconditionally on every
+    // launch before, costing one write per user per app open for no reason.
+    if (_lastSyncedToken == token) return;
 
     try {
       await FirebaseFirestore.instance
@@ -104,6 +144,7 @@ class NotificationService {
         'fcmToken': token,
         'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      _lastSyncedToken = token;
       debugPrint('FCM Token saved to Firestore for user $uid');
     } catch (e) {
       debugPrint('Failed to save FCM token: $e');

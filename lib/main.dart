@@ -9,7 +9,6 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'firebase_options.dart';
 import 'routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
-import 'seed_courses.dart';
 import 'services/analytics_service.dart';
 import 'services/notification_service.dart';
 import 'services/connectivity_service.dart';
@@ -54,10 +53,17 @@ Future<void> _initFirebase() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-    // Sync core courses asynchronously in background (non-blocking for instant app launch)
-    seedUserProvidedCourses().catchError((e) {
-      debugPrint('Course seeding skipped: $e');
-    });
+    // Offline cache must be configured BEFORE the Firestore client starts —
+    // once any read/write runs, settings can no longer be changed. Applies to
+    // web as well, so cached reads are reused there instead of re-billed.
+    try {
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: 100 * 1024 * 1024, // 100 MB — prevents unbounded disk usage
+      );
+    } catch (e) {
+      debugPrint('Firestore persistence settings error: $e');
+    }
 
     // App Check (Mobile)
     if (!kIsWeb) {
@@ -69,36 +75,38 @@ Future<void> _initFirebase() async {
       } catch (e) {
         debugPrint('App Check activation skipped/failed: $e');
       }
-
-      try {
-        FirebaseFirestore.instance.settings = const Settings(
-          persistenceEnabled: true,
-          cacheSizeBytes: 100 * 1024 * 1024, // 100 MB — prevents unbounded disk usage
-        );
-      } catch (e) {
-        debugPrint('Firestore persistence settings error: $e');
-      }
     }
   } catch (e) {
     debugPrint('Firebase initialization failed: $e');
   }
 }
 
-class StudySphereApp extends ConsumerWidget {
+class StudySphereApp extends ConsumerStatefulWidget {
   const StudySphereApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(routerProvider);
+  ConsumerState<StudySphereApp> createState() => _StudySphereAppState();
+}
 
-    // Using a basic approach: just log app open once when the widget builds
-    // since we already know the app has opened.
+class _StudySphereAppState extends ConsumerState<StudySphereApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Runs once for the app's lifetime. This used to sit in build() behind a
+    // post-frame callback, so every rebuild re-registered the FCM listeners and
+    // re-logged app_open.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(analyticsServiceProvider).logAppOpen();
       final notifService = ref.read(notificationServiceProvider);
-      notifService.attachRouter(router);
+      notifService.attachRouter(ref.read(routerProvider));
       notifService.initialize();
     });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
       title: 'StudySphere',
@@ -131,8 +139,10 @@ class _ConnectivityWrapperState extends ConsumerState<ConnectivityWrapper> {
   void initState() {
     super.initState();
     _checkConnectivity();
-    // Poll every 2 seconds to detect online/offline state changes rapidly
-    _connectivityTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    // Poll for online/offline changes. This was every 2 seconds for the entire
+    // app lifetime (1,800 network probes an hour) purely to drive an overlay;
+    // 15 seconds is still responsive but a fraction of the battery and data.
+    _connectivityTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       _checkConnectivity();
     });
 

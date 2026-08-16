@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class PostModel {
   final String postId;
   final String authorId;
@@ -68,7 +70,8 @@ class PostModel {
       'commentsCount': commentsCount,
       'reposts': reposts,
       'shares': shares,
-      'createdAt': createdAt,
+      'createdAt': FieldValue.serverTimestamp(), // ✅ server timestamp
     };
   }
 }
+

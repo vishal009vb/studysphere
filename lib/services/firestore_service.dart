@@ -366,6 +366,63 @@ class FirestoreService {
     return notes;
   }
 
+  /// Same query as [fetchNotes] but also returns the last document so callers
+  /// can do real cursor pagination instead of re-fetching every previous page
+  /// with an ever-growing `limit`.
+  Future<({List<NoteModel> notes, DocumentSnapshot? lastDoc})> fetchNotesPage({
+    String? course,
+    String? semester,
+    String? subject,
+    String? sortBy,
+    String? collegeId,
+    String? district,
+    String? state,
+    int limit = 15,
+    DocumentSnapshot? lastDoc,
+  }) async {
+    Query query = _db.collection('notes').where('status', isEqualTo: 'approved');
+
+    if (collegeId != null && collegeId.isNotEmpty) {
+      query = query.where('collegeId', whereIn: [collegeId, 'Global']);
+    } else if (district != null && district.isNotEmpty) {
+      query = query.where('district', whereIn: [district, 'Global']);
+    } else if (state != null && state.isNotEmpty) {
+      query = query.where('state', whereIn: [state, 'Global']);
+    }
+
+    if (course != null && course.isNotEmpty) {
+      query = query.where('course', isEqualTo: course);
+    }
+    if (semester != null && semester.isNotEmpty) {
+      query = query.where('semester', isEqualTo: semester);
+    }
+    if (subject != null && subject.isNotEmpty) {
+      query = query.where('subject', isEqualTo: subject);
+    }
+
+    query = query.limit(limit);
+    if (lastDoc != null) {
+      query = query.startAfterDocument(lastDoc);
+    }
+
+    final snapshot = await query.get();
+    final notes = snapshot.docs
+        .map((doc) => NoteModel.fromMap(doc.data() as dynamic, doc.id))
+        .toList();
+
+    notes.sort((a, b) {
+      if (sortBy == 'downloads') return b.downloads.compareTo(a.downloads);
+      if (sortBy == 'likes') return b.likes.compareTo(a.likes);
+      if (sortBy == 'qualityScore') return b.qualityScore.compareTo(a.qualityScore);
+      return b.createdAt.compareTo(a.createdAt);
+    });
+
+    return (
+      notes: notes,
+      lastDoc: snapshot.docs.isEmpty ? null : snapshot.docs.last,
+    );
+  }
+
   Future<List<NoteModel>> fetchUserUploads(String uid) async {
     final snapshot = await _db
         .collection('notes')
@@ -451,6 +508,7 @@ class FirestoreService {
     String? collegeId,
     String? district,
     String? state,
+    int limit = 50,
   }) async {
     Query query = _db.collection('questionPapers').where('status', isEqualTo: 'approved');
 
@@ -466,6 +524,10 @@ class FirestoreService {
     if (semester != null && semester.isNotEmpty) query = query.where('semester', isEqualTo: semester);
     if (subject != null && subject.isNotEmpty) query = query.where('subject', isEqualTo: subject);
     if (year != null && year.isNotEmpty) query = query.where('year', isEqualTo: year);
+
+    // Bounded — this had no limit at all, so every call was a full scan of
+    // every approved paper matching the filters.
+    query = query.limit(limit);
 
     final snapshot = await query.get();
     return snapshot.docs
@@ -670,34 +732,59 @@ class FirestoreService {
     });
   }
 
-  Future<List<UserModel>> getFollowers(String userId) async {
-    final snapshot = await _db.collection('followers').where('followingId', isEqualTo: userId).get();
-    List<UserModel> users = [];
-    for (var doc in snapshot.docs) {
-      final followerId = doc.data()['followerId'] as String?;
-      if (followerId != null) {
-        try {
-          final user = await getUserProfile(followerId);
-          users.add(user);
-        } catch (_) {}
+  /// Batch-loads user docs by id using `whereIn` (10 ids per query) instead of
+  /// one sequential read per id. Batches run concurrently.
+  Future<List<UserModel>> _fetchUsersByIds(List<String> ids) async {
+    if (ids.isEmpty) return [];
+
+    final chunks = <List<String>>[];
+    for (var i = 0; i < ids.length; i += 10) {
+      chunks.add(ids.sublist(i, i + 10 > ids.length ? ids.length : i + 10));
+    }
+
+    final snapshots = await Future.wait(
+      chunks.map(
+        (chunk) => _db
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: chunk)
+            .get(),
+      ),
+    );
+
+    // Preserve the caller's id order.
+    final byId = <String, UserModel>{};
+    for (final snap in snapshots) {
+      for (final doc in snap.docs) {
+        byId[doc.id] = UserModel.fromMap(doc.data());
       }
     }
-    return users;
+    return ids.map((id) => byId[id]).whereType<UserModel>().toList();
   }
 
-  Future<List<UserModel>> getFollowing(String userId) async {
-    final snapshot = await _db.collection('followers').where('followerId', isEqualTo: userId).get();
-    List<UserModel> users = [];
-    for (var doc in snapshot.docs) {
-      final followingId = doc.data()['followingId'] as String?;
-      if (followingId != null) {
-        try {
-          final user = await getUserProfile(followingId);
-          users.add(user);
-        } catch (_) {}
-      }
-    }
-    return users;
+  Future<List<UserModel>> getFollowers(String userId, {int limit = 50}) async {
+    final snapshot = await _db
+        .collection('followers')
+        .where('followingId', isEqualTo: userId)
+        .limit(limit)
+        .get();
+    final ids = snapshot.docs
+        .map((doc) => doc.data()['followerId'] as String?)
+        .whereType<String>()
+        .toList();
+    return _fetchUsersByIds(ids);
+  }
+
+  Future<List<UserModel>> getFollowing(String userId, {int limit = 50}) async {
+    final snapshot = await _db
+        .collection('followers')
+        .where('followerId', isEqualTo: userId)
+        .limit(limit)
+        .get();
+    final ids = snapshot.docs
+        .map((doc) => doc.data()['followingId'] as String?)
+        .whereType<String>()
+        .toList();
+    return _fetchUsersByIds(ids);
   }
 
   Future<bool> isFollowingUser(String followerId, String followingId) async {
@@ -709,7 +796,11 @@ class FirestoreService {
     final snapshot = await _db.collection('users').limit(40).get();
     List<UserModel> suggestions = [];
     
-    final followingSnapshot = await _db.collection('followers').where('followerId', isEqualTo: currentUid).get();
+    final followingSnapshot = await _db
+        .collection('followers')
+        .where('followerId', isEqualTo: currentUid)
+        .limit(200)
+        .get();
     final followingIds = followingSnapshot.docs.map((doc) => doc.data()['followingId'] as String?).toSet();
 
     final seenUsernames = <String>{};
@@ -1014,6 +1105,12 @@ class FirestoreService {
     return _db
         .collection('notifications')
         .where('receiverId', isEqualTo: userId)
+        // orderBy is required for limit() to mean "the newest 50". Without it
+        // Firestore returns an arbitrary 50 by document ID, so users with more
+        // than 50 notifications could miss the most recent ones entirely and
+        // the unread badge count was wrong. Uses the existing
+        // receiverId + createdAt composite index.
+        .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
         .map((snap) {
@@ -1224,6 +1321,12 @@ class FirestoreService {
     final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
     return _db
         .collection('global_notifications')
+        // Was an unbounded listener on the entire collection for the whole app
+        // session. isActive is now filtered server-side and the result is
+        // capped to the newest 20, matching the 30-day client-side window.
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(20)
         .snapshots()
         .map((snap) {
       final list = snap.docs
@@ -1309,8 +1412,15 @@ class FirestoreService {
   }
 
   // ── Admin: Colleges ──
-  Future<List<CollegeModel>> getAllColleges() async {
-    final snap = await _db.collection('colleges').get();
+  /// Bounded: the colleges collection is large and this rendered into a single
+  /// table, so an unlimited fetch was billed on every admin visit and after
+  /// every single-row toggle.
+  Future<List<CollegeModel>> getAllColleges({int limit = 200}) async {
+    final snap = await _db
+        .collection('colleges')
+        .orderBy('collegeName')
+        .limit(limit)
+        .get();
     return snap.docs.map((d) => CollegeModel.fromMap(d.data(), d.id)).toList();
   }
 

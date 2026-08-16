@@ -1,10 +1,13 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/providers/app_cache_provider.dart';
 import '../../services/firestore_service.dart';
-import '../../services/auth_service.dart';
 import '../../models/note_model.dart';
 import '../../models/user_model.dart';
 import '../../core/widgets/shimmer_widgets.dart';
@@ -38,6 +41,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _hasMoreNotes = true;
+  Timer? _searchDebounce;
+  // Cursor for real pagination. Previously each page re-fetched every prior
+  // page by growing limit (15, 30, 45...), which is quadratic.
+  DocumentSnapshot? _lastNoteDoc;
 
   UserModel? _userProfile;
   late AnimationController _fabAnimCtrl;
@@ -165,10 +172,9 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
   Future<void> _loadUserProfile() async {
     setState(() => _isLoading = true);
     try {
-      final user = ref.read(authServiceProvider).currentUser;
-      if (user != null) {
-        _userProfile = await ref.read(firestoreServiceProvider).getUserProfile(user.uid);
-      }
+      // Reuse the shared cached profile instead of issuing another read for a
+      // document the app has already fetched.
+      _userProfile = await ref.read(userProfileProvider.future);
     } catch (e) {
       // ignore
     } finally {
@@ -178,42 +184,49 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _fabAnimCtrl.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  // Tier filters, shared by the first page and by _loadMoreNotes so both apply
+  // the same constraints.
+  String? _tierCollegeId() =>
+      (_selectedTier == 'My College' && (_userProfile?.collegeId.isNotEmpty ?? false))
+          ? _userProfile!.collegeId
+          : null;
+
+  String? _tierDistrict() =>
+      (_selectedTier == 'My District' && (_userProfile?.district.isNotEmpty ?? false))
+          ? _userProfile!.district
+          : null;
+
+  String? _tierState() =>
+      (_selectedTier == 'My State' && (_userProfile?.state.isNotEmpty ?? false))
+          ? _userProfile!.state
+          : null;
+
   Future<void> _loadNotes() async {
     setState(() {
       _isLoading = true;
       _hasMoreNotes = true;
+      _lastNoteDoc = null; // reset the pagination cursor for a fresh query
     });
     try {
       final firestoreService = ref.read(firestoreServiceProvider);
-      
-      String? filterCollegeId;
-      String? filterDistrict;
-      String? filterState;
-      
-      if (_userProfile != null) {
-        if (_selectedTier == 'My College' && _userProfile!.collegeId.isNotEmpty) {
-          filterCollegeId = _userProfile!.collegeId;
-        } else if (_selectedTier == 'My District' && _userProfile!.district.isNotEmpty) {
-          filterDistrict = _userProfile!.district;
-        } else if (_selectedTier == 'My State' && _userProfile!.state.isNotEmpty) {
-          filterState = _userProfile!.state;
-        }
-      }
 
-      final notes = await firestoreService.fetchNotes(
+      final page = await firestoreService.fetchNotesPage(
         course: _selectedCourse.isEmpty || _selectedCourse == 'All' ? null : _selectedCourse,
         semester: _selectedSemester.isEmpty || _selectedSemester == 'All' ? null : _selectedSemester,
         sortBy: _sortBy,
-        collegeId: filterCollegeId,
-        district: filterDistrict,
-        state: filterState,
+        collegeId: _tierCollegeId(),
+        district: _tierDistrict(),
+        state: _tierState(),
         limit: 15,
       );
+      final notes = page.notes;
+      _lastNoteDoc = page.lastDoc;
 
       // We handle client side subject filtering by loading more if needed but for phase 1 we just keep it simple
       if (_selectedSubject.isNotEmpty || _searchQuery.isNotEmpty) {
@@ -244,23 +257,27 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
     setState(() => _isLoadingMore = true);
     try {
       final firestoreService = ref.read(firestoreServiceProvider);
-      // Wait we don't have the last doc because we sorted client side.
-      // Since we sort client side, we can't easily do cursor pagination with firestore `startAfter`.
-      // Let's fallback to limit offset if possible, but firestore doesn't support offset easily without reading all.
-      // For now, in Phase 1, we fetch more items by increasing limit if sorting by likes etc, 
-      // or we just rely on the first 30 items.
-      final notes = await firestoreService.fetchNotes(
+      // Cursor pagination: fetch only the next page. This also carries the tier
+      // filters, which the old grow-the-limit version silently dropped (so
+      // page 2 returned a different result set than page 1).
+      final page = await firestoreService.fetchNotesPage(
         course: _selectedCourse.isEmpty || _selectedCourse == 'All' ? null : _selectedCourse,
         semester: _selectedSemester.isEmpty || _selectedSemester == 'All' ? null : _selectedSemester,
         sortBy: _sortBy,
-        limit: _notes.length + 15,
+        collegeId: _tierCollegeId(),
+        district: _tierDistrict(),
+        state: _tierState(),
+        limit: 15,
+        lastDoc: _lastNoteDoc,
       );
-      
+
       setState(() {
-        if (notes.length <= _notes.length) {
+        if (page.notes.isEmpty) {
           _hasMoreNotes = false;
+        } else {
+          _notes = [..._notes, ...page.notes];
+          _lastNoteDoc = page.lastDoc;
         }
-        _notes = notes;
       });
     } catch (e) {
       // ignore
@@ -456,7 +473,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen>
                   ),
                   onChanged: (val) {
                     setState(() => _searchQuery = val);
-                    _loadNotes();
+                    // Debounced: this used to fire a Firestore query on every
+                    // keystroke, so a 15-character search cost 15 queries.
+                    _searchDebounce?.cancel();
+                    _searchDebounce = Timer(
+                      const Duration(milliseconds: 450),
+                      () {
+                        if (mounted) _loadNotes();
+                      },
+                    );
                   },
                 ),
               ),
