@@ -68,9 +68,11 @@ Future<void> _initFirebase() async {
     // App Check (Mobile)
     if (!kIsWeb) {
       try {
+        // Use PlayIntegrity for release, debug provider only in debug mode
+        const bool isRelease = bool.fromEnvironment('dart.vm.product');
         await FirebaseAppCheck.instance.activate(
-          androidProvider: AndroidProvider.debug,
-          appleProvider: AppleProvider.debug,
+          androidProvider: isRelease ? AndroidProvider.playIntegrity : AndroidProvider.debug,
+          appleProvider: isRelease ? AppleProvider.deviceCheck : AppleProvider.debug,
         );
       } catch (e) {
         debugPrint('App Check activation skipped/failed: $e');
