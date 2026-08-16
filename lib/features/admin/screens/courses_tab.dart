@@ -83,6 +83,58 @@ class AdminCoursesTab extends ConsumerWidget {
         title: const Text('Manage Courses'),
         backgroundColor: Colors.white,
         actions: [
+          // ── Seed all 38 built-in courses into Firestore ──
+          TextButton.icon(
+            icon: const Icon(Icons.cloud_upload_outlined, color: Colors.green, size: 18),
+            label: const Text(
+              'Seed Courses',
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+            ),
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Seed All Courses?'),
+                  content: const Text(
+                    '38 built-in courses will be upserted into Firestore (merge mode).\n\n'
+                    '✅ Existing courses are SAFE — their data is preserved.\n'
+                    '✅ New courses will be added.\n'
+                    '✅ Existing flags (isVisible, isDeleted) are NOT changed.',
+                  ),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Seed Now', style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm != true) return;
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('⏳ Seeding courses to Firestore...')),
+              );
+              try {
+                await seedUserProvidedCourses(force: true);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('✅ 38 courses seeded successfully!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+          ),
           TextButton(
             onPressed: () async {
               try {
