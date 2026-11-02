@@ -332,9 +332,10 @@ StudySphere uses **Cloud Firestore** as its primary database. The security rules
 ## 🗺 Roadmap
 
 ### v1.1 — Stability & Onboarding
-- [ ] Replace hardcoded API key fallbacks in `ai_scraper/config.py` with env-only config
-- [ ] Add meaningful widget/unit tests
-- [ ] CI/CD pipeline (GitHub Actions — lint + test on PRs)
+- [x] Strict environment variable configuration for `ai_scraper` (hardcoded API key fallbacks removed)
+- [x] Automated CI/CD pipeline (GitHub Actions — lint, test & secret scanning)
+- [ ] Add comprehensive unit and widget tests
+- [ ] Automated dependency security auditing in CI
 
 ### v1.2 — Features
 - [ ] Move AI quota enforcement fully server-side (Supabase → Firestore)

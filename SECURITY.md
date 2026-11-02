@@ -17,7 +17,7 @@ StudySphere is currently in active development. Security fixes are applied to th
 
 If you discover a security vulnerability, please report it responsibly by emailing:
 
-📧 **[vishal009vb@gmail.com]** *(replace with your actual security contact email)*
+📧 **[vishal009vb@gmail.com](mailto:vishal009vb@gmail.com)**
 
 ### What to Include
 

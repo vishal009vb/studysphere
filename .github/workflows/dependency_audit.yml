@@ -29,15 +29,16 @@ jobs:
         run: flutter pub get
 
       - name: Run pub outdated
-        run: flutter pub outdated --no-dev-dependencies || true
+        run: flutter pub outdated --no-dev-dependencies
 
-      - name: Check for dependency issues
-        run: flutter pub deps --json | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-packages = data.get('packages', [])
-print(f'Total packages: {len(packages)}')
-"
+      - name: Check dependency tree
+        run: |
+          flutter pub deps --json | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          packages = data.get("packages", [])
+          print(f"Total dependencies analyzed: {len(packages)}")
+          '
 
   python-audit:
     name: Python Dependency Audit (AI Scraper)
@@ -58,4 +59,4 @@ print(f'Total packages: {len(packages)}')
 
       - name: Audit Python dependencies
         working-directory: ai_scraper
-        run: pip-audit -r requirements.txt --desc || true
+        run: pip-audit -r requirements.txt --desc
