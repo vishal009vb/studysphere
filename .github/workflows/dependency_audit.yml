@@ -1,0 +1,61 @@
+name: Dependency Security Audit
+
+on:
+  schedule:
+    # Run every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dart-audit:
+    name: Dart Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run pub outdated
+        run: flutter pub outdated --no-dev-dependencies || true
+
+      - name: Check for dependency issues
+        run: flutter pub deps --json | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+packages = data.get('packages', [])
+print(f'Total packages: {len(packages)}')
+"
+
+  python-audit:
+    name: Python Dependency Audit (AI Scraper)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        working-directory: ai_scraper
+        run: pip-audit -r requirements.txt --desc || true

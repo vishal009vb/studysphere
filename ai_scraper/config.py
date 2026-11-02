@@ -98,12 +98,32 @@ FIREBASE_SERVICE_ACCOUNT = os.path.join(BASE_DIR, 'serviceAccountKey.json')
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY')
 
-# Search API Keys (You can add your additional free API keys here)
+# Search API Keys
+# SECURITY: These keys MUST be set via environment variables.
+# Do NOT use the hardcoded fallback values — those have been intentionally
+# removed. Set them in ai_scraper/.env or export them in your shell:
+#   export SERPAPI_KEY=your_key_here
+#   export GOOGLE_API_KEY=your_key_here
+#   export GOOGLE_CX=your_cx_id_here
 SERPAPI_KEYS = [
-    os.environ.get('SERPAPI_KEY', 'addee223100ddea0794a7c782e22353dd1f20d2e9d7ff147fcd1a8518e6cfbcd'),
-    # 'YOUR_SECOND_FREE_API_KEY_HERE',
+    os.environ.get('SERPAPI_KEY'),
+    # Add additional keys via environment: SERPAPI_KEY_2, etc.
 ]
+# Remove None values (unset keys)
+SERPAPI_KEYS = [k for k in SERPAPI_KEYS if k]
 
 # Google Custom Search API (Recommended - 100 free queries/day)
-GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', 'AIzaSyAGE0u--1UmcLUTjCH2CKDZ-Qdsq8YfCHk')
-GOOGLE_CX = os.environ.get('GOOGLE_CX', 'a09489c1e84af4e8f')
+# Get your key at: https://developers.google.com/custom-search/v1/overview
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+GOOGLE_CX = os.environ.get('GOOGLE_CX')
+
+if not GOOGLE_API_KEY:
+    logger.warning(
+        "GOOGLE_API_KEY is not set. Google Custom Search will be disabled. "
+        "Set it in ai_scraper/.env or as an environment variable."
+    )
+if not GOOGLE_CX:
+    logger.warning(
+        "GOOGLE_CX is not set. Google Custom Search will be disabled. "
+        "Set it in ai_scraper/.env or as an environment variable."
+    )

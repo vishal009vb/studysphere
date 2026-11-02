@@ -18,9 +18,7 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code — uncomment if you want to ignore workspace settings
 #.vscode/
 
 # Flutter/Dart/Pub related
@@ -39,72 +37,51 @@ app.*.symbols
 # Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+# Android build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
 
+# Environment files — NEVER commit secrets
 .env
 supabase/.env.local
 supabase/.env
+ai_scraper/.env
 
 # Node modules
 **/node_modules/
 node_modules/
 
-# Supabase local secrets — NEVER commit
+# Supabase local secrets
 supabase/config.toml.local
 
-# AI Scraper
+# Firebase credentials — NEVER commit
 serviceAccountKey.json
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+
+# SSH / private keys — NEVER commit
 *.pem
+*.key
+*.p12
+*.pfx
+
+# AI Scraper runtime artifacts
 ai_scraper/venv/
 ai_scraper/__pycache__/
 ai_scraper/downloads/
 ai_scraper/logs/
+ai_scraper/keys/
+
+# Python general
 __pycache__/
+*.py[cod]
 venv/
 .venv/
-*-firebase-adminsdk-*.json
+
+# Misc build/generated
+*.symbols
+app.*.map.json
+skills-lock.json
+desktop.ini

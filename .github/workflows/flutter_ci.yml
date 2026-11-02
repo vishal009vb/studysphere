@@ -1,0 +1,61 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "lib/**"
+      - "test/**"
+      - "pubspec.yaml"
+      - "pubspec.lock"
+      - "analysis_options.yaml"
+
+# Minimum permissions — read-only by default
+permissions:
+  contents: read
+
+jobs:
+  analyze-and-test:
+    name: Analyze & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib/ test/
+
+      - name: Run static analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        run: flutter test --no-pub
+
+      - name: Check for hardcoded secrets (basic scan)
+        run: |
+          # Fail if any .dart file contains a raw Gemini/OpenAI API key pattern
+          if grep -rE "AIzaSy[A-Za-z0-9_-]{33}|sk-[A-Za-z0-9]{40}" lib/ --include="*.dart" --exclude="firebase_options.dart"; then
+            echo "❌ Potential hardcoded API key found in Dart source files."
+            echo "   Firebase API keys in firebase_options.dart are expected — all others are not."
+            exit 1
+          fi
+          echo "✅ No unexpected hardcoded API keys detected."
