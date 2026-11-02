@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `LICENSE` — MIT License
 - `CONTRIBUTING.md` — contributor guide
 - `SECURITY.md` — security policy and vulnerability reporting
 - `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1

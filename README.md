@@ -11,7 +11,7 @@
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-%3E%3D3.0.0-0175C2?logo=dart)](https://dart.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%7C%20Auth%20%7C%20Storage-FFCA28?logo=firebase)](https://firebase.google.com)
-[![License](https://img.shields.io/badge/License-Not%20yet%20licensed-red)](#-license)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
 
 </div>
@@ -377,11 +377,7 @@ Read our [Security Policy](SECURITY.md) for responsible disclosure instructions.
 
 ## 📜 License
 
-**This project does not currently have an open-source license.**
-
-The absence of a license means the code is under default copyright — contributors and users should be aware that explicit usage rights have not yet been granted. The maintainer is evaluating license options (MIT, Apache-2.0, GPL-3.0).
-
-*A license will be added before the first public release.*
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
